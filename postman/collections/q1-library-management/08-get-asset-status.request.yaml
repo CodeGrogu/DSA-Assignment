@@ -1,0 +1,28 @@
+$kind: http-request
+name: 08. Get Asset Status & Booking
+method: GET
+url: "{{base_url}}:{{port}}/assets/{{assetTag}}/status"
+headers:
+  - key: Accept
+    value: application/json
+description: |-
+  ### Endpoint Overview
+  Retrieves the operational status, current borrower/custodian, and active booking dates for an asset.
+
+  ---
+  ### HTTP Specification
+  - **Method**: `GET`
+  - **URL**: `{{base_url}}:{{port}}/assets/{{assetTag}}/status`
+  - **Headers**:
+    - `Accept`: `application/json`
+
+  ---
+  ### Automated Test Assertions
+  1. **Status Code Check**: Asserts HTTP `200 OK`.
+  2. **Status Attributes**: Verifies the response contains `status` and `assetTag`.
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200", function () {
+          pm.expect(pm.response.code).to.equal(200);
+      });

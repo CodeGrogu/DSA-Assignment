@@ -1,0 +1,76 @@
+$kind: http-request
+name: 04. Create Asset
+method: POST
+url: "{{base_url}}:{{port}}/assets"
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: Accept
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "assetTag": "TAG-TEST-001",
+      "name": "Introduction to Distributed Systems",
+      "description": "Standard university textbook for DSA612S course.",
+      "institution": "Ministry of Higher Education",
+      "site": "Main Campus Library",
+      "status": "AVAILABLE",
+      "dateAcquired": "2026-01-15",
+      "components": [
+        {
+          "compId": "COMP-01",
+          "name": "Hardcover Binding",
+          "description": "Reinforced library binding"
+        }
+      ],
+      "schedules": [
+        {
+          "scheduleId": "SCH-01",
+          "dueDate": "2026-12-01",
+          "scheduleType": "INSPECTION",
+          "details": "Annual physical condition check"
+        }
+      ],
+      "workOrders": []
+    }
+description: |-
+  ### Endpoint Overview
+  Registers a new educational or institutional asset in the in-memory repository.
+
+  ---
+  ### HTTP Specification
+  - **Method**: `POST`
+  - **URL**: `{{base_url}}:{{port}}/assets`
+  - **Headers**:
+    - `Content-Type`: `application/json`
+    - `Accept`: `application/json`
+
+  ---
+  ### Request Body (`Asset`)
+  - `assetTag` (*string, required*): Unique primary identifier (camelCase).
+  - `name` (*string, required*): Human-readable asset title.
+  - `institution` (*string, required*): Owning ministry or educational organisation.
+  - `site` (*string, required*): Physical campus or repository site.
+  - `status` (*string, required*): `AVAILABLE`, `LOANED_OUT`, `UNDER_MAINTENANCE`, `RESERVED`, `DISPOSED`.
+  - `components` (*array*): Sub-part items attached to the asset.
+  - `schedules` (*array*): Maintenance and booking schedules.
+  - `workOrders` (*array*): Associated work orders.
+
+  ---
+  ### Automated Test Assertions
+  1. **Status Code Check**: Asserts HTTP `201 Created` or `200 OK`.
+  2. **Primary Key Validation**: Asserts `assetTag` exists in the response.
+  3. **Dynamic Environment Variable Setting**: Persists `assetTag` into `{{assetTag}}` for downstream tests.
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 201 or 200", function () {
+          pm.expect(pm.response.code).to.be.oneOf([200, 201]);
+      });
+      pm.test("Captured assetTag in camelCase", function () {
+          var json = pm.response.json();
+          pm.expect(json).to.have.property("assetTag");
+          pm.environment.set("assetTag", json.assetTag);
+      });

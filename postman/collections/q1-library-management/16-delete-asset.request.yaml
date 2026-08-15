@@ -1,0 +1,27 @@
+$kind: http-request
+name: 16. Delete Asset
+method: DELETE
+url: "{{base_url}}:{{port}}/assets/{{assetTag}}"
+headers:
+  - key: Accept
+    value: application/json
+description: |-
+  ### Endpoint Overview
+  Permanently removes an asset record and all attached sub-resources from the system store.
+
+  ---
+  ### HTTP Specification
+  - **Method**: `DELETE`
+  - **URL**: `{{base_url}}:{{port}}/assets/{{assetTag}}`
+  - **Headers**:
+    - `Accept`: `application/json`
+
+  ---
+  ### Automated Test Assertions
+  1. **Status Code Check**: Asserts HTTP `200 OK` or `204 No Content`.
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200 or 204", function () {
+          pm.expect(pm.response.code).to.be.oneOf([200, 204]);
+      });

@@ -5,7 +5,19 @@ generated/
 # dependencies
 Dependencies.toml
 
-# config files
+# config and environment files
 Config.toml
+Config.local.toml
+*.secret.toml
+.env
+.env.*
+!.env.example
+!Config.example.toml
 # the config files used for testing, Uncomment the following line if you want to commit the test config files
 #!**/tests/Config.toml
+
+# Agent / AI assistant files
+.agents/
+.gemini/
+GEMINI.md
+AGENTS.md

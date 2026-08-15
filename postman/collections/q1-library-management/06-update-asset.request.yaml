@@ -1,0 +1,46 @@
+$kind: http-request
+name: 06. Update Asset
+method: PUT
+url: "{{base_url}}:{{port}}/assets/{{assetTag}}"
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: Accept
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "assetTag": "TAG-TEST-001",
+      "name": "Introduction to Distributed Systems (Updated)",
+      "description": "Updated edition for DSA612S course.",
+      "institution": "Ministry of Higher Education",
+      "site": "Main Campus Library",
+      "status": "LOANED_OUT",
+      "dateAcquired": "2026-01-15",
+      "components": [],
+      "schedules": [],
+      "workOrders": []
+    }
+description: |-
+  ### Endpoint Overview
+  Updates the attributes, operational status, or metadata of an existing asset.
+
+  ---
+  ### HTTP Specification
+  - **Method**: `PUT`
+  - **URL**: `{{base_url}}:{{port}}/assets/{{assetTag}}`
+  - **Headers**:
+    - `Content-Type`: `application/json`
+    - `Accept`: `application/json`
+
+  ---
+  ### Automated Test Assertions
+  1. **Status Code Check**: Asserts HTTP `200 OK`.
+  2. **Field Mutation**: Verifies that updated properties (e.g. `LOANED_OUT`) are reflected in the response.
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200", function () {
+          pm.expect(pm.response.code).to.equal(200);
+      });

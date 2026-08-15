@@ -1,0 +1,8 @@
+{
+    "ballerina-vscode.trace.server": "messages",
+    "ballerina.ai.showContextUsage": true,
+    "ballerina.copilot.enableMcpTools": true,
+    "ballerina.debugLog": false,
+    "ballerina.enableInlayHints": true,
+    "ballerina.pluginDevMode": false
+}

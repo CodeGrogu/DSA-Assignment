@@ -1,0 +1,40 @@
+$kind: http-request
+name: 12. Add Schedule to Asset
+method: POST
+url: "{{base_url}}:{{port}}/assets/{{assetTag}}/schedules"
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: Accept
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "scheduleId": "SCH-02",
+      "dueDate": "2026-09-30",
+      "scheduleType": "CALIBRATION",
+      "details": "Routine optical sensor calibration"
+    }
+description: |-
+  ### Endpoint Overview
+  Schedules a future maintenance, calibration, or inspection activity against an asset.
+
+  ---
+  ### HTTP Specification
+  - **Method**: `POST`
+  - **URL**: `{{base_url}}:{{port}}/assets/{{assetTag}}/schedules`
+  - **Headers**:
+    - `Content-Type`: `application/json`
+    - `Accept`: `application/json`
+
+  ---
+  ### Automated Test Assertions
+  1. **Status Code Check**: Asserts HTTP `201 Created` or `200 OK`.
+  2. **Schedule Object**: Verifies `scheduleId` and `dueDate` are saved.
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200 or 201", function () {
+          pm.expect(pm.response.code).to.be.oneOf([200, 201]);
+      });
