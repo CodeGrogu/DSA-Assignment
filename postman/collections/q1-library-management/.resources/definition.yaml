@@ -1,0 +1,3 @@
+$kind: collection
+name: Q1 - Library & Resource Management System
+description: Comprehensive RESTful API test suite for Assignment 1 Question 1 (Distributed Library & Resource Management System). Covers asset lifecycle, filtering, scheduling, components, and work orders.

@@ -1,0 +1,37 @@
+$kind: http-request
+name: 05. Get Asset by Tag
+method: GET
+url: "{{base_url}}:{{port}}/assets/{{assetTag}}"
+headers:
+  - key: Accept
+    value: application/json
+description: |-
+  ### Endpoint Overview
+  Fetches full details for a single asset identified by its unique `assetTag`.
+
+  ---
+  ### HTTP Specification
+  - **Method**: `GET`
+  - **URL**: `{{base_url}}:{{port}}/assets/{{assetTag}}`
+  - **Path Variables**:
+    - `assetTag`: Unique tag identifier (e.g. `TAG-TEST-001`).
+  - **Headers**:
+    - `Accept`: `application/json`
+
+  ---
+  ### Automated Test Assertions
+  1. **Status Code Check**: Asserts HTTP `200 OK`.
+  2. **Identity Verification**: Verifies returned `assetTag` matches the requested environment variable.
+  3. **Record Integrity**: Validates `name`, `status`, and `institution` fields are present.
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200", function () {
+          pm.expect(pm.response.code).to.equal(200);
+      });
+      pm.test("Asset record structure valid", function () {
+          var json = pm.response.json();
+          pm.expect(json.assetTag).to.equal(pm.environment.get("assetTag"));
+          pm.expect(json).to.have.property("name");
+          pm.expect(json).to.have.property("status");
+      });

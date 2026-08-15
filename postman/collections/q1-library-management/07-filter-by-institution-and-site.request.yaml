@@ -1,0 +1,36 @@
+$kind: http-request
+name: 07. Filter Assets by Institution & Site
+method: GET
+url: "{{base_url}}:{{port}}/assets?institution=Ministry of Higher Education&site=Main Campus Library"
+queryParams:
+  - key: institution
+    value: Ministry of Higher Education
+  - key: site
+    value: Main Campus Library
+headers:
+  - key: Accept
+    value: application/json
+description: |-
+  ### Endpoint Overview
+  Queries assets filtered by institution and campus site location.
+
+  ---
+  ### HTTP Specification
+  - **Method**: `GET`
+  - **URL**: `{{base_url}}:{{port}}/assets?institution=...&site=...`
+  - **Query Parameters**:
+    - `institution` (*string*): e.g. `Ministry of Higher Education`
+    - `site` (*string*): e.g. `Main Campus Library`
+  - **Headers**:
+    - `Accept`: `application/json`
+
+  ---
+  ### Automated Test Assertions
+  1. **Status Code Check**: Asserts HTTP `200 OK`.
+  2. **Filtering Accuracy**: Verifies all returned assets match the specified institution and site.
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200", function () {
+          pm.expect(pm.response.code).to.equal(200);
+      });

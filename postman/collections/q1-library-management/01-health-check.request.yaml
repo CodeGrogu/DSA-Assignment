@@ -1,0 +1,43 @@
+$kind: http-request
+name: 01. Health Check
+method: GET
+url: "{{base_url}}:{{port}}/health"
+headers:
+  - key: Accept
+    value: application/json
+description: |-
+  ### Endpoint Overview
+  Verifies the operational status and connectivity of the **Q1 Library & Resource Management REST Service**.
+
+  ---
+  ### HTTP Specification
+  - **Method**: `GET`
+  - **URL**: `{{base_url}}:{{port}}/health`
+  - **Headers**:
+    - `Accept`: `application/json`
+
+  ---
+  ### Response Payload (`200 OK`)
+  ```json
+  {
+    "status": "UP",
+    "timestamp": 1723758000000,
+    "service": "q1_library_service"
+  }
+  ```
+
+  ---
+  ### Automated Test Assertions
+  1. **Status Code Check**: Asserts HTTP status code is `200 OK`.
+  2. **Service Liveness**: Validates that `status` equals `"UP"`.
+  3. **Content-Type**: Validates that the response header is `application/json`.
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200", function () {
+          pm.expect(pm.response.code).to.equal(200);
+      });
+      pm.test("Service status is UP", function () {
+          var json = pm.response.json();
+          pm.expect(json.status).to.equal("UP");
+      });

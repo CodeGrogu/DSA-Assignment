@@ -1,0 +1,11 @@
+[package]
+org = "peerpressure"
+name = "q1_library_service"
+version = "0.1.0"
+distribution = "2201.13.5"
+authors = ["Jaden Awaseb", "Peer Pressure Team"]
+keywords = ["dsa", "rest", "library-management", "ballerina", "distributed-systems"]
+repository = "https://github.com/CodeGrogu/DSA-Assignment"
+
+[build-options]
+observabilityIncluded = true

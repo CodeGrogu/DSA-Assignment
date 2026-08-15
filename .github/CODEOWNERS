@@ -1,0 +1,7 @@
+# ==============================================================================
+# GitHub Code Owners Configuration
+# Defines default repository owners and module-level ownership for code reviews.
+# ==============================================================================
+
+# Global repository owner
+* @CodeGrogu

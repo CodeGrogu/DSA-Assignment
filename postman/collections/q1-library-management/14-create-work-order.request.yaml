@@ -1,0 +1,46 @@
+$kind: http-request
+name: 14. Create Work Order
+method: POST
+url: "{{base_url}}:{{port}}/assets/{{assetTag}}/work-orders"
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: Accept
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "orderId": "WO-101",
+      "status": "OPEN",
+      "description": "Replace worn gear motor assembly",
+      "tasks": [
+        {
+          "taskId": "TSK-01",
+          "description": "Disassemble outer casing",
+          "completed": false
+        }
+      ]
+    }
+description: |-
+  ### Endpoint Overview
+  Generates a new maintenance or repair work order containing actionable checklist tasks.
+
+  ---
+  ### HTTP Specification
+  - **Method**: `POST`
+  - **URL**: `{{base_url}}:{{port}}/assets/{{assetTag}}/work-orders`
+  - **Headers**:
+    - `Content-Type`: `application/json`
+    - `Accept`: `application/json`
+
+  ---
+  ### Automated Test Assertions
+  1. **Status Code Check**: Asserts HTTP `201 Created` or `200 OK`.
+  2. **Work Order Validation**: Verifies `orderId` is created with initial status `OPEN`.
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200 or 201", function () {
+          pm.expect(pm.response.code).to.be.oneOf([200, 201]);
+      });

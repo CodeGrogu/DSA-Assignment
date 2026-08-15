@@ -1,0 +1,15 @@
+# ==============================================================================
+# Q1 Library & Resource Management System - Configuration Template
+# Copy this file to Config.toml for local execution:
+#   cp Config.example.toml Config.toml
+# ==============================================================================
+
+[peerpressure.q1_library_service]
+# Port on which the RESTful HTTP API service listens
+servicePort = 9090
+
+# Host address for the HTTP service listener
+serviceHost = "0.0.0.0"
+
+# Service log level (DEBUG, INFO, WARN, ERROR)
+logLevel = "INFO"

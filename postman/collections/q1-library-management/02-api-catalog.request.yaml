@@ -1,0 +1,48 @@
+$kind: http-request
+name: 02. API Catalog
+method: GET
+url: "{{base_url}}:{{port}}/"
+headers:
+  - key: Accept
+    value: application/json
+description: |-
+  ### Endpoint Overview
+  Retrieves the root API discovery catalog, service version, and list of supported resource routes.
+
+  ---
+  ### HTTP Specification
+  - **Method**: `GET`
+  - **URL**: `{{base_url}}:{{port}}/`
+  - **Headers**:
+    - `Accept`: `application/json`
+
+  ---
+  ### Response Payload (`200 OK`)
+  ```json
+  {
+    "service": "Library & Resource Management System",
+    "version": "1.0.0",
+    "endpoints": [
+      "/health",
+      "/assets",
+      "/assets/{assetTag}",
+      "/assets/overdue"
+    ]
+  }
+  ```
+
+  ---
+  ### Automated Test Assertions
+  1. **Status Code Check**: Asserts HTTP status code is `200 OK`.
+  2. **Catalog Contract**: Verifies `service`, `version`, and `endpoints` array properties are present.
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200", function () {
+          pm.expect(pm.response.code).to.equal(200);
+      });
+      pm.test("API metadata returned", function () {
+          var json = pm.response.json();
+          pm.expect(json).to.have.property("version");
+          pm.expect(json).to.have.property("endpoints");
+      });

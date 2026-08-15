@@ -1,0 +1,47 @@
+$kind: http-request
+name: 03. Get All Assets (Global View)
+method: GET
+url: "{{base_url}}:{{port}}/assets"
+headers:
+  - key: Accept
+    value: application/json
+description: |-
+  ### Endpoint Overview
+  Fetches the complete collection of library and educational assets across all institutions and campus sites.
+
+  ---
+  ### HTTP Specification
+  - **Method**: `GET`
+  - **URL**: `{{base_url}}:{{port}}/assets`
+  - **Headers**:
+    - `Accept`: `application/json`
+
+  ---
+  ### Response Payload (`200 OK`)
+  Returns an array of `Asset` records:
+  ```json
+  [
+    {
+      "assetTag": "TAG-TEST-001",
+      "name": "Introduction to Distributed Systems",
+      "institution": "Ministry of Higher Education",
+      "site": "Main Campus Library",
+      "status": "AVAILABLE"
+    }
+  ]
+  ```
+
+  ---
+  ### Automated Test Assertions
+  1. **Status Code Check**: Asserts HTTP status code is `200 OK`.
+  2. **Array Structure**: Verifies the response body is a JSON array.
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200", function () {
+          pm.expect(pm.response.code).to.equal(200);
+      });
+      pm.test("Response is an array", function () {
+          var json = pm.response.json();
+          pm.expect(Array.isArray(json)).to.be.true;
+      });

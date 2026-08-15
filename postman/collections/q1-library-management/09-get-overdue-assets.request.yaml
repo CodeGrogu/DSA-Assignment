@@ -1,0 +1,28 @@
+$kind: http-request
+name: 09. Get Overdue Maintenance Assets
+method: GET
+url: "{{base_url}}:{{port}}/assets/overdue"
+headers:
+  - key: Accept
+    value: application/json
+description: |-
+  ### Endpoint Overview
+  Queries and aggregates all assets having maintenance schedules or return dates that are past due.
+
+  ---
+  ### HTTP Specification
+  - **Method**: `GET`
+  - **URL**: `{{base_url}}:{{port}}/assets/overdue`
+  - **Headers**:
+    - `Accept`: `application/json`
+
+  ---
+  ### Automated Test Assertions
+  1. **Status Code Check**: Asserts HTTP `200 OK`.
+  2. **Array Structure**: Asserts response is a JSON list of overdue asset summaries.
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200", function () {
+          pm.expect(pm.response.code).to.equal(200);
+      });

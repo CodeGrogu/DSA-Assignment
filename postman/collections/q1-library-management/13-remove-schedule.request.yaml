@@ -1,0 +1,27 @@
+$kind: http-request
+name: 13. Remove Schedule from Asset
+method: DELETE
+url: "{{base_url}}:{{port}}/assets/{{assetTag}}/schedules/{{scheduleId}}"
+headers:
+  - key: Accept
+    value: application/json
+description: |-
+  ### Endpoint Overview
+  Cancels or removes a maintenance/booking schedule from an asset.
+
+  ---
+  ### HTTP Specification
+  - **Method**: `DELETE`
+  - **URL**: `{{base_url}}:{{port}}/assets/{{assetTag}}/schedules/{{scheduleId}}`
+  - **Headers**:
+    - `Accept`: `application/json`
+
+  ---
+  ### Automated Test Assertions
+  1. **Status Code Check**: Asserts HTTP `200 OK` or `204 No Content`.
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200 or 204", function () {
+          pm.expect(pm.response.code).to.be.oneOf([200, 204]);
+      });
