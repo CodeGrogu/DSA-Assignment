@@ -1,8 +1,3 @@
-// Copyright (c) 2026 Peer Pressure Team. All Rights Reserved.
-//
-// Distributed under the MIT License.
-// See LICENSE file in the project root for full license information.
-
 import ballerina/test;
 
 @test:Config {}
@@ -91,7 +86,6 @@ function testJsonDeserializationAndRoundTrip() returns error? {
         ]
     };
 
-    // Deserialise JSON to Asset record
     Asset asset = check rawJson.cloneWithType(Asset);
     test:assertEquals(asset.assetTag, "TAG-002");
     test:assertEquals(asset.status, "UNDER_MAINTENANCE");
@@ -104,7 +98,6 @@ function testJsonDeserializationAndRoundTrip() returns error? {
     test:assertTrue(asset.workOrders[0].tasks[0].completed);
     test:assertFalse(asset.workOrders[0].tasks[1].completed);
 
-    // Serialise back to JSON and confirm identity
     json serializedJson = asset.toJson();
     Asset roundTripAsset = check serializedJson.cloneWithType(Asset);
     test:assertEquals(roundTripAsset.assetTag, asset.assetTag);
@@ -114,17 +107,15 @@ function testJsonDeserializationAndRoundTrip() returns error? {
 
 @test:Config {}
 function testStatusValidators() {
-    // Valid lifecycle states
     test:assertTrue(isValidAssetStatus("AVAILABLE"));
     test:assertTrue(isValidAssetStatus("LOANED_OUT"));
     test:assertTrue(isValidAssetStatus("OCCUPIED"));
     test:assertTrue(isValidAssetStatus("UNDER_MAINTENANCE"));
     test:assertTrue(isValidAssetStatus("DISPOSED"));
 
-    // Invalid states
     test:assertFalse(isValidAssetStatus("BROKEN"));
     test:assertFalse(isValidAssetStatus("UNKNOWN"));
-    test:assertFalse(isValidAssetStatus("available")); // case-sensitive
+    test:assertFalse(isValidAssetStatus("available"));
     test:assertFalse(isValidAssetStatus(""));
 }
 
@@ -158,13 +149,13 @@ function testSubRecordDefaults() {
         taskId: "TSK-99",
         description: "Verify power supply stability"
     };
-    test:assertFalse(task.completed, "Default task completion flag must be false");
+    test:assertFalse(task.completed);
 
     WorkOrder workOrder = {
         orderId: "WO-999",
         status: "OPEN",
         description: "Routine inspection"
     };
-    test:assertEquals(workOrder.tasks.length(), 0, "Default task list must be empty");
-    test:assertEquals(workOrder.compId, (), "Optional compId should default to nil");
+    test:assertEquals(workOrder.tasks.length(), 0);
+    test:assertEquals(workOrder.compId, ());
 }

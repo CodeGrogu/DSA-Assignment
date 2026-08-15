@@ -1,8 +1,3 @@
-// Copyright (c) 2026 Peer Pressure Team. All Rights Reserved.
-//
-// Distributed under the MIT License.
-// See LICENSE file in the project root for full license information.
-
 import ballerina/http;
 import ballerina/test;
 
