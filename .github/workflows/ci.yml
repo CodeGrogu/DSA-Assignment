@@ -24,15 +24,24 @@ jobs:
 
       - name: Verify Code Formatting
         run: |
-          echo "Verifying Ballerina code formatting..."
-          bal format --dry-run
+          echo "Verifying Ballerina code formatting across all packages..."
+          for pkg in $(find . -maxdepth 2 -name "Ballerina.toml" -exec dirname {} \;); do
+            echo "Checking format in: $pkg"
+            (cd "$pkg" && bal format --dry-run)
+          done
 
       - name: Run Automated Tests with Coverage
         run: |
-          echo "Executing test suite across packages..."
-          bal test --test-report --code-coverage
+          echo "Executing automated test suite across all packages..."
+          for pkg in $(find . -maxdepth 2 -name "Ballerina.toml" -exec dirname {} \;); do
+            echo "Running tests in: $pkg"
+            (cd "$pkg" && bal test --test-report --code-coverage)
+          done
 
       - name: Compile and Build Packages
         run: |
-          echo "Compiling Ballerina executables..."
-          bal build
+          echo "Compiling Ballerina packages..."
+          for pkg in $(find . -maxdepth 2 -name "Ballerina.toml" -exec dirname {} \;); do
+            echo "Building package in: $pkg"
+            (cd "$pkg" && bal build)
+          done
