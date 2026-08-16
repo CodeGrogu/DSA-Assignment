@@ -21,3 +21,6 @@ Config.local.toml
 .gemini/
 GEMINI.md
 AGENTS.md
+
+# Explainer documentation (kept local only)
+explainer/
