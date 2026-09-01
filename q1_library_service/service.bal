@@ -280,4 +280,47 @@ service / on httpListener {
         }
         return woToUpdate.toJson();
     }
+
+    # Retrieves all registered institutions.
+    # + return - JSON array of all institution records
+    resource function get institutions() returns json {
+        return store:getAllInstitutions().toJson();
+    }
+
+    # Adds a new institution to the system.
+    # + payload - Complete institution record payload
+    # + return - Created institution record (201) or error response (400)
+    resource function post institutions(@http:Payload models:Institution payload) returns http:Created|http:BadRequest {
+        error? result = store:addInstitution(payload);
+        if result is error {
+            return <http:BadRequest>{
+                body: {
+                    timestamp: time:utcToString(time:utcNow()),
+                    status: 400,
+                    reason: "Bad Request",
+                    message: result.message(),
+                    path: "/institutions"
+                }
+            };
+        }
+        return <http:Created>{body: payload.toJson()};
+    }
+
+    # Removes an institution by its unique ID.
+    # + id - Unique identifier of the institution
+    # + return - Confirmation message (200) or 404 Not Found
+    resource function delete institutions/[string id]() returns json|http:NotFound {
+        boolean deleted = store:deleteInstitution(id);
+        if !deleted {
+            return <http:NotFound>{
+                body: {
+                    message: string `Institution with ID '${id}' not found.`
+                }
+            };
+        }
+        return {
+            message: string `Institution '${id}' removed successfully.`,
+            id: id
+        };
+    }
 }
