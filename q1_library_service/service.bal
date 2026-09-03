@@ -69,23 +69,26 @@ service / on httpListener {
 
     # Registers a new asset in the system.
     # + payload - Complete asset record payload
-    # + return - Created asset record (201) or error response (400)
-    resource function post assets(@http:Payload models:Asset payload) returns http:Created|http:BadRequest {
-        error? result = store:addAsset(payload);
-        if result is error {
-            return <http:BadRequest>{
+    # + return - Created asset record (201),Bad request (400) or Conflict(409)
+     resource function post assets(@http:Payload models:Asset payload) returns http:Created|http:BadRequest|http:Conflict {
+    error? result = store:addAsset(payload);
+
+    if result is error {
+        string msg = result.message();
+
+        if msg.includes("already exists") {
+            return <http:Conflict>{
                 body: {
                     timestamp: time:utcToString(time:utcNow()),
-                    status: 400,
-                    reason: "Bad Request",
-                    message: result.message(),
+                    status: 409,
+                    reason: "Conflict",
+                    message: msg,
                     path: "/assets"
                 }
             };
         }
-        return <http:Created>{body: payload.toJson()};
-    }
 
+    }
     # Retrieves a single asset by unique asset tag.
     # + assetTag - Unique asset tag
     # + return - Asset record (200) or 404 Not Found
