@@ -26,6 +26,7 @@ function testRootEndpoint() returns error? {
 @test:Config {
     groups: ["service", "crud"]
 }
+
 function testCompleteAssetLifecycleAndEndpoints() returns error? {
     // 1. Initial count
     json[] initialAssets = check testClient->/assets;
@@ -172,4 +173,157 @@ function testCompleteAssetLifecycleAndEndpoints() returns error? {
     // 16. Verify count restored
     json[] remaining = check testClient->/assets;
     test:assertEquals(remaining.length(), initialCount);
+}
+
+@test:Config {
+    groups: ["service", "workorders", "tasks"]
+}
+function testAddTaskToWorkOrder() returns error? {
+    models:Asset woAsset = {
+        assetTag: "TAG-WO-TASK-001",
+        name: "3D Printer Test Unit",
+        description: "Scratch asset for work order task tests.",
+        institution: "Ministry of Higher Education",
+        site: "Main Campus Library",
+        status: "AVAILABLE",
+        dateAcquired: "2026-01-15",
+        components: [],
+        schedules: [],
+        workOrders: [
+            {
+                orderId: "WO-TASK-01",
+                status: "OPEN",
+                description: "Nozzle heat-bed failure",
+                tasks: [
+                    {
+                        taskId: "T1",
+                        description: "Check thermal sensor connectivity.",
+                        completed: false
+                    }
+                ]
+            }
+        ]
+    };
+    http:Response createRes = check testClient->/assets.post(woAsset.toJson());
+    test:assertEquals(createRes.statusCode, 201);
+
+    models:Task newTask = {
+        taskId: "T2",
+        description: "Replace nozzle heater cartridge.",
+        completed: false
+    };
+    http:Response addTaskRes = check testClient->post(
+        string `/assets/TAG-WO-TASK-001/work-orders/WO-TASK-01/tasks`,
+        newTask.toJson()
+    );
+    test:assertEquals(addTaskRes.statusCode, 201);
+
+    json fetchedJson = check testClient->/assets/["TAG-WO-TASK-001"];
+    models:Asset fetched = check fetchedJson.cloneWithType(models:Asset);
+    models:WorkOrder wo = fetched.workOrders[0];
+    test:assertEquals(wo.tasks.length(), 2);
+    test:assertEquals(wo.tasks[1].taskId, "T2");
+
+    http:Response cleanup = check testClient->/assets/["TAG-WO-TASK-001"].delete();
+    test:assertEquals(cleanup.statusCode, 200);
+}
+
+@test:Config {
+    groups: ["service", "workorders", "tasks"]
+}
+function testMarkTaskCompleted() returns error? {
+    models:Asset woAsset = {
+        assetTag: "TAG-WO-TASK-002",
+        name: "3D Printer Test Unit 2",
+        description: "Scratch asset for task completion tests.",
+        institution: "Ministry of Higher Education",
+        site: "Main Campus Library",
+        status: "AVAILABLE",
+        dateAcquired: "2026-01-15",
+        components: [],
+        schedules: [],
+        workOrders: [
+            {
+                orderId: "WO-TASK-02",
+                status: "OPEN",
+                description: "Belt tension issue",
+                tasks: [
+                    {
+                        taskId: "T1",
+                        description: "Inspect X-axis belt.",
+                        completed: false
+                    }
+                ]
+            }
+        ]
+    };
+    http:Response createRes = check testClient->/assets.post(woAsset.toJson());
+    test:assertEquals(createRes.statusCode, 201);
+
+    json patchRes = check testClient->patch(
+        string `/assets/TAG-WO-TASK-002/work-orders/WO-TASK-02/tasks/T1`,
+        {completed: true}
+    );
+    models:WorkOrder patchedWo = check patchRes.cloneWithType(models:WorkOrder);
+    test:assertEquals(patchedWo.tasks[0].completed, true);
+
+    http:Response cleanup = check testClient->/assets/["TAG-WO-TASK-002"].delete();
+    test:assertEquals(cleanup.statusCode, 200);
+}
+
+@test:Config {
+    groups: ["service", "workorders", "tasks"]
+}
+function testCloseWorkOrderRequiresAllTasksComplete() returns error? {
+    models:Asset woAsset = {
+        assetTag: "TAG-WO-TASK-003",
+        name: "3D Printer Test Unit 3",
+        description: "Scratch asset for close-work-order tests.",
+        institution: "Ministry of Higher Education",
+        site: "Main Campus Library",
+        status: "AVAILABLE",
+        dateAcquired: "2026-01-15",
+        components: [],
+        schedules: [],
+        workOrders: [
+            {
+                orderId: "WO-TASK-03",
+                status: "OPEN",
+                description: "Extruder jam",
+                tasks: [
+                    {
+                        taskId: "T1",
+                        description: "Clear filament jam.",
+                        completed: false
+                    }
+                ]
+            }
+        ]
+    };
+    http:Response createRes = check testClient->/assets.post(woAsset.toJson());
+    test:assertEquals(createRes.statusCode, 201);
+
+    // Attempt to close with an incomplete task — should fail
+    http:Response closeFailRes = check testClient->post(
+        string `/assets/TAG-WO-TASK-003/work-orders/WO-TASK-03/close`,
+        ()
+    );
+    test:assertEquals(closeFailRes.statusCode, 400);
+
+    // Mark the task complete
+    json _ = check testClient->patch(
+        string `/assets/TAG-WO-TASK-003/work-orders/WO-TASK-03/tasks/T1`,
+        {completed: true}
+    );
+
+    // Close again — should succeed
+    json closeOkJson = check testClient->post(
+        string `/assets/TAG-WO-TASK-003/work-orders/WO-TASK-03/close`,
+        ()
+    );
+    models:WorkOrder closedWo = check closeOkJson.cloneWithType(models:WorkOrder);
+    test:assertEquals(closedWo.status, "CLOSED");
+
+    http:Response cleanup = check testClient->/assets/["TAG-WO-TASK-003"].delete();
+    test:assertEquals(cleanup.statusCode, 200);
 }

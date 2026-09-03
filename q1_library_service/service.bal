@@ -45,7 +45,10 @@ service / on httpListener {
                 "/assets/{assetTag}/schedules",
                 "/assets/{assetTag}/schedules/{scheduleId}",
                 "/assets/{assetTag}/work-orders",
-                "/assets/{assetTag}/work-orders/{orderId}"
+                "/assets/{assetTag}/work-orders/{orderId}",
+                "/assets/{assetTag}/work-orders/{orderId}/tasks",
+                "/assets/{assetTag}/work-orders/{orderId}/tasks/{taskId}",
+                "/assets/{assetTag}/work-orders/{orderId}/close"
             ]
         };
     }
@@ -281,4 +284,137 @@ service / on httpListener {
         return woToUpdate.toJson();
     }
 
+    # Adds a sub-task to an existing work order.
+    # + assetTag - Unique asset tag
+    # + orderId - Unique work order identifier
+    # + task - New task payload
+    # + return - Created task (201) or error response
+    resource function post assets/[string assetTag]/work\-orders/[string orderId]/tasks(@http:Payload models:Task task) returns http:Created|http:NotFound|http:BadRequest {
+        models:Asset? asset = store:getAsset(assetTag);
+        if asset is () {
+            return <http:NotFound>{body: {message: string `Asset with tag '${assetTag}' not found.`}};
+        }
+        int? idx = ();
+        foreach int i in 0 ..< asset.workOrders.length() {
+            if asset.workOrders[i].orderId == orderId {
+                idx = i;
+                break;
+            }
+        }
+        if idx is () {
+            return <http:NotFound>{body: {message: string `Work order '${orderId}' not found on asset '${assetTag}'.`}};
+        }
+        models:WorkOrder wo = asset.workOrders[idx];
+        foreach models:Task t in wo.tasks {
+            if t.taskId == task.taskId {
+                return <http:BadRequest>{body: {message: string `Task '${task.taskId}' already exists on work order '${orderId}'.`}};
+            }
+        }
+        models:Task[] updatedTasks = [];
+        foreach models:Task t in wo.tasks {
+            updatedTasks.push(t);
+        }
+        updatedTasks.push(task);
+
+        models:WorkOrder updatedWo = {
+            orderId: wo.orderId,
+            status: wo.status,
+            description: wo.description,
+            compId: wo.compId,
+            tasks: updatedTasks
+        };
+        error? result = store:updateWorkOrder(assetTag, updatedWo);
+        if result is error {
+            return <http:BadRequest>{body: {message: result.message()}};
+        }
+        return <http:Created>{body: task.toJson()};
+    }
+
+    # Updates a sub-task's completion status within a work order.
+    # + assetTag - Unique asset tag
+    # + orderId - Unique work order identifier
+    # + taskId - Unique task identifier
+    # + payload - New completion state
+    # + return - Updated work order (200) or error response
+    resource function patch assets/[string assetTag]/work\-orders/[string orderId]/tasks/[string taskId](@http:Payload record {|boolean completed;|} payload) returns json|http:NotFound {
+        models:Asset? asset = store:getAsset(assetTag);
+        if asset is () {
+            return <http:NotFound>{body: {message: string `Asset with tag '${assetTag}' not found.`}};
+        }
+        int? woIdx = ();
+        foreach int i in 0 ..< asset.workOrders.length() {
+            if asset.workOrders[i].orderId == orderId {
+                woIdx = i;
+                break;
+            }
+        }
+        if woIdx is () {
+            return <http:NotFound>{body: {message: string `Work order '${orderId}' not found on asset '${assetTag}'.`}};
+        }
+        models:WorkOrder wo = asset.workOrders[woIdx];
+        models:Task[] updatedTasks = [];
+        boolean found = false;
+        foreach models:Task t in wo.tasks {
+            if t.taskId == taskId {
+                updatedTasks.push({taskId: t.taskId, description: t.description, completed: payload.completed});
+                found = true;
+            } else {
+                updatedTasks.push(t);
+            }
+        }
+        if !found {
+            return <http:NotFound>{body: {message: string `Task '${taskId}' not found on work order '${orderId}'.`}};
+        }
+        models:WorkOrder updatedWo = {
+            orderId: wo.orderId,
+            status: wo.status,
+            description: wo.description,
+            compId: wo.compId,
+            tasks: updatedTasks
+        };
+        error? result = store:updateWorkOrder(assetTag, updatedWo);
+        if result is error {
+            return <http:NotFound>{body: {message: result.message()}};
+        }
+        return updatedWo.toJson();
+    }
+
+    # Closes a work order once all its tasks are completed.
+    # + assetTag - Unique asset tag
+    # + orderId - Unique work order identifier
+    # + return - Closed work order (200) or error response
+    resource function post assets/[string assetTag]/work\-orders/[string orderId]/close() returns json|http:NotFound|http:BadRequest {
+        models:Asset? asset = store:getAsset(assetTag);
+        if asset is () {
+            return <http:NotFound>{body: {message: string `Asset with tag '${assetTag}' not found.`}};
+        }
+        int? idx = ();
+        foreach int i in 0 ..< asset.workOrders.length() {
+            if asset.workOrders[i].orderId == orderId {
+                idx = i;
+                break;
+            }
+        }
+        if idx is () {
+            return <http:NotFound>{body: {message: string `Work order '${orderId}' not found on asset '${assetTag}'.`}};
+        }
+        models:WorkOrder wo = asset.workOrders[idx];
+        foreach models:Task t in wo.tasks {
+            if !t.completed {
+                return <http:BadRequest>{body: {message: string `Cannot close work order '${orderId}': task '${t.taskId}' is not completed.`}};
+            }
+        }
+        models:WorkOrder closedWo = {
+            orderId: wo.orderId,
+            status: "CLOSED",
+            description: wo.description,
+            compId: wo.compId,
+            tasks: wo.tasks
+        };
+        error? result = store:updateWorkOrder(assetTag, closedWo);
+        if result is error {
+            return <http:BadRequest>{body: {message: result.message()}};
+        }
+        return closedWo.toJson();
+    }
 }
