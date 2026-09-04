@@ -60,6 +60,12 @@ function testStoreBasicCrud() returns error? {
 }
 
 @test:Config {}
+function testGetAllAssetsOnEmptyStore() {
+    models:Asset[] assets = getAllAssets();
+    test:assertEquals(assets.length(), 0);
+}
+
+@test:Config {}
 function testDuplicateAssetTagRejection() returns error? {
     models:Asset asset1 = createTestAsset("TAG-DUP-01");
     check addAsset(asset1);

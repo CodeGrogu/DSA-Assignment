@@ -18,8 +18,21 @@ body:
       "site": "Main Campus Library",
       "status": "LOANED_OUT",
       "dateAcquired": "2026-01-15",
-      "components": [],
-      "schedules": [],
+      "components": [
+        {
+          "compId": "COMP-01",
+          "name": "Hardcover Binding",
+          "description": "Reinforced library binding"
+        }
+      ],
+      "schedules": [
+        {
+          "scheduleId": "SCH-01",
+          "dueDate": "2026-12-01",
+          "scheduleType": "INSPECTION",
+          "details": "Annual physical condition check"
+        }
+      ],
       "workOrders": []
     }
 description: |-
