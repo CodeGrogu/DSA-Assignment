@@ -1,5 +1,14 @@
 import peerpressure/q1_library_service.models;
 
+isolated function hasOverdueSchedule(models:Asset asset, string currentDate) returns boolean {
+    foreach models:Schedule schedule in asset.schedules {
+        if schedule.dueDate < currentDate {
+            return true;
+        }
+    }
+    return false;
+}
+
 isolated class AssetStore {
     private table<models:Asset> key(assetTag) assetTable = table [];
 
@@ -66,14 +75,7 @@ isolated class AssetStore {
         lock {
             models:Asset[] overdue = [];
             foreach models:Asset asset in self.assetTable {
-                boolean hasOverdueSchedule = false;
-                foreach models:Schedule sched in asset.schedules {
-                    if sched.dueDate < currentDate {
-                        hasOverdueSchedule = true;
-                        break;
-                    }
-                }
-                if hasOverdueSchedule {
+                if hasOverdueSchedule(asset, currentDate) {
                     overdue.push(asset.cloneReadOnly());
                 }
             }

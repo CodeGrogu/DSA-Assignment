@@ -115,11 +115,19 @@ function testCompleteAssetLifecycleAndEndpoints() returns error? {
     models:Schedule newSched = {
         scheduleId: "SCH-02",
         dueDate: "2026-04-01",
-        scheduleType: "CALIBRATION",
-        details: "Routine optical sensor calibration"
+        scheduleType: "BOOKING",
+        details: "Reserved for the Engineering Department"
     };
     http:Response addSchedRes = check testClient->/assets/["TAG-TEST-001"]/schedules.post(newSched.toJson());
     test:assertEquals(addSchedRes.statusCode, 201);
+
+    json bookingStatus = check testClient->/assets/["TAG-TEST-001"]/status;
+    test:assertEquals(check bookingStatus.status, "LOANED_OUT");
+    json bookingSchedulesJson = check bookingStatus.bookingSchedules;
+    json[] bookingSchedules = <json[]>bookingSchedulesJson;
+    map<json> booking = <map<json>>bookingSchedules[0];
+    test:assertEquals(booking["bookedFor"], "Reserved for the Engineering Department");
+    test:assertEquals(booking["until"], "2026-04-01");
 
     // 10. Query Overdue Assets
     json[] overdue = check testClient->/assets/overdue(currentDate = "2026-06-01");

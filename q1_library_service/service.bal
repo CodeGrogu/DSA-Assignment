@@ -168,11 +168,22 @@ service / on httpListener {
                 active.push(wo);
             }
         }
+        json[] bookingSchedules = [];
+        foreach models:Schedule schedule in asset.schedules {
+            if schedule.scheduleType == "BOOKING" {
+                bookingSchedules.push({
+                    scheduleId: schedule.scheduleId,
+                    bookedFor: schedule.details,
+                    until: schedule.dueDate
+                });
+            }
+        }
         return {
             assetTag: asset.assetTag,
             name: asset.name,
             status: asset.status,
             schedules: asset.schedules.toJson(),
+            bookingSchedules: bookingSchedules,
             activeWorkOrders: active.toJson()
         };
     }
@@ -180,11 +191,30 @@ service / on httpListener {
     # Retrieves all assets with overdue maintenance or booking schedules.
     # + currentDate - Optional ISO comparison date (defaults to current UTC date)
     # + return - Array of assets with overdue schedules
-    resource function get assets/overdue(string? currentDate) returns json {
-        string dateToCompare = currentDate ?: "2026-12-31";
+   resource function get assets/overdue(string? currentDate) returns json|http:BadRequest {
+        string dateToCompare;
+
+        if currentDate is string {
+            // Validate basic ISO YYYY-MM-DD date length
+            if currentDate.length() < 10 {
+                return <http:BadRequest>{
+                    body: {
+                        timestamp: time:utcToString(time:utcNow()),
+                        status: 400,
+                        reason: "Bad Request",
+                        message: "Invalid date format. Expected 'YYYY-MM-DD'.",
+                        path: "/assets/overdue"
+                    }
+                };
+            }
+            dateToCompare = currentDate.substring(0, 10);
+        } else {
+            // Dynamically extract YYYY-MM-DD from current UTC time
+            dateToCompare = time:utcToString(time:utcNow()).substring(0, 10);
+        }
+
         return store:getOverdueAssets(dateToCompare).toJson();
     }
-
     # Attaches a new component sub-resource to an asset.
     # + assetTag - Unique asset tag
     # + component - Component payload
