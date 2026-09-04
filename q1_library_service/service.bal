@@ -70,37 +70,38 @@ service / on httpListener {
     # Registers a new asset in the system.
     # + payload - Complete asset record payload
     # + return - Created asset record (201),Bad request (400) or Conflict(409)
-  resource function post assets(@http:Payload models:Asset payload) returns http:Created|http:BadRequest|http:Conflict {
-    error? result = store:addAsset(payload);
+    resource function post assets(@http:Payload models:Asset payload) returns http:Created|http:BadRequest|http:Conflict {
+        error? result = store:addAsset(payload);
 
-    if result is error {
-        string msg = result.message();
+        if result is error {
+            string msg = result.message();
 
-        if msg.includes("already exists") {
-            return <http:Conflict>{
+            if msg.includes("already exists") {
+                return <http:Conflict>{
+                    body: {
+                        timestamp: time:utcToString(time:utcNow()),
+                        status: 409,
+                        reason: "Conflict",
+                        message: msg,
+                        path: "/assets"
+                    }
+                };
+            }
+
+            return <http:BadRequest>{
                 body: {
                     timestamp: time:utcToString(time:utcNow()),
-                    status: 409,
-                    reason: "Conflict",
+                    status: 400,
+                    reason: "Bad Request",
                     message: msg,
                     path: "/assets"
                 }
             };
         }
 
-        return <http:BadRequest>{
-            body: {
-                timestamp: time:utcToString(time:utcNow()),
-                status: 400,
-                reason: "Bad Request",
-                message: msg,
-                path: "/assets"
-            }
-        };
+        return <http:Created>{body: payload.toJson()};
     }
 
-    return <http:Created>{body: payload.toJson()};
-}
     # Retrieves a single asset by unique asset tag.
     # + assetTag - Unique asset tag
     # + return - Asset record (200) or 404 Not Found
@@ -206,7 +207,7 @@ service / on httpListener {
     # Retrieves all assets with overdue maintenance or booking schedules.
     # + currentDate - Optional ISO comparison date (defaults to current UTC date)
     # + return - Array of assets with overdue schedules
-   resource function get assets/overdue(string? currentDate) returns json|http:BadRequest {
+    resource function get assets/overdue(string? currentDate) returns json|http:BadRequest {
         string dateToCompare;
 
         if currentDate is string {
@@ -230,6 +231,7 @@ service / on httpListener {
 
         return store:getOverdueAssets(dateToCompare).toJson();
     }
+
     # Attaches a new component sub-resource to an asset.
     # + assetTag - Unique asset tag
     # + component - Component payload
