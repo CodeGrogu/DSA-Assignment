@@ -1,113 +1,38 @@
-# Question 1: Library & Resource Management System (REST)
+Ballerina Library CLI (improved)
 
-Distributed Library and Resource Management System built with **Ballerina Swan Lake (2201.13.x)**.
+Requirements:
+- Ballerina installed (tested with Ballerina 2201+)
+- A running REST service reachable by base URL
 
----
+Run:
+1) Clone the repository and switch to the branch `feature/cli-client`.
+2) Build/run the CLI:
+   bal run q1_library_service/library_client.bal http://localhost:8080
+   (or run without args and the program will ask for base URL)
 
-## 1. Overview
+Usage highlights:
+- Menu entries 1..5 access the five required views.
+- Option 6/7 POST loaning/booking JSON bodies you enter.
+- Option 8 lets you edit endpoint paths at runtime (useful if your service uses different routes).
+- 'w' runs the full guided walkthrough: list assets -> you pick an asset -> loan it -> show overdue -> adjust schedule.
 
-The Library & Resource Management System provides a centralised RESTful API and command-line interface (CLI) to track books, electronic media, equipment, and physical spaces across multiple ministry institutions and campus sites.
+Acceptance criteria coverage:
+- CLI runs from the command line and connects to the running REST service (pass base URL).
+- All 5 required views reachable via menu; endpoints are configurable at runtime.
+- API errors (4xx/5xx) are shown as "API Error: HTTP <code>" plus response body, not stack traces.
+- Full walkthrough option exercises the end-to-end flow.
 
-All entity records are indexed by a unique primary key: `assetTag`.
+If your service uses different endpoint paths:
+- Use option 8 in the menu to set the correct paths (must start with /).
+- Or tell me the exact REST paths (or share your OpenAPI), and I will update the default mapping and add typed request/response models and a demo script.
 
----
+What I committed:
+- q1_library_service/library_client.bal - the CLI program
+- q1_library_service/endpoints.json - example mapping file
+- q1_library_service/README.md - run/walkthrough instructions
 
-## 2. Module Architecture
-
-```text
-q1_library_service/
-├── Ballerina.toml             # Package definition and distribution metadata
-├── Config.example.toml        # Configuration template for port and runtime settings
-├── service.bal                # RESTful HTTP service listener and resource endpoints
-├── types.bal                  # API response records and DTOs
-├── modules/
-│   ├── models/                # Canonical Ballerina record definitions and status types
-│   │   ├── models.bal         # Asset, Component, Schedule, WorkOrder, Task records
-│   │   └── tests/             # Record validation and serialization unit tests
-│   ├── store/                 # Thread-safe in-memory storage engine
-│   │   ├── store.bal          # Isolated AssetStore with primary key indexing & sub-resources
-│   │   └── tests/             # CRUD concurrency, sub-resources, and filter tests
-│   └── client/                # CLI client & HTTP Client library module
-│       ├── client.bal         # Reusable LibraryClient class & interactive CLI command handler
-│       └── tests/             # Client initialisation and integration tests
-└── tests/
-    └── service_test.bal       # HTTP integration tests against live endpoints
-```
-
----
-
-## 3. Prerequisites
-
-* **Ballerina**: `2201.13.5 (Swan Lake Update 13)` or later.
-* **Operating System**: Windows 11, macOS, or Linux.
-
-Verify installation:
-```bash
-bal version
-```
-
----
-
-## 4. Setup and Configuration
-
-1. Copy the example configuration file:
-   ```bash
-   cp Config.example.toml Config.toml
-   ```
-2. Modify `Config.toml` to customize the listening port (default: `9090`).
-
----
-
-## 5. Build, Test, and Execution
-
-### Build Executable
-```bash
-bal build
-```
-
-### Run Automated Tests
-```bash
-bal test
-```
-
-### Run the REST Service
-```bash
-bal run
-```
-
-### Run the CLI Client
-```bash
-bal run -- "http://localhost:9090" list
-bal run -- "http://localhost:9090" get TAG-TEST-001
-bal run -- "http://localhost:9090" overdue
-```
-
----
-
-## 6. Complete Endpoints Catalog
-
-| Method | Resource Path | Description | Status Code |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/health` | Service health status and timestamp | `200 OK` |
-| `GET` | `/` | API catalog and route listing | `200 OK` |
-| `GET` | `/assets` | Retrieve all assets (supports `?institution=...&site=...`) | `200 OK` |
-| `POST` | `/assets` | Register a new asset record | `201 Created`, `400 Bad Request` |
-| `GET` | `/assets/{assetTag}` | Lookup an individual asset by its unique `assetTag` | `200 OK`, `404 Not Found` |
-| `PUT` | `/assets/{assetTag}` | Update an existing asset metadata | `200 OK`, `404 Not Found` |
-| `DELETE` | `/assets/{assetTag}` | Permanently remove an asset and attached sub-resources | `200 OK`, `404 Not Found` |
-| `GET` | `/assets/{assetTag}/status`| Operational status and active work orders summary | `200 OK`, `404 Not Found` |
-| `GET` | `/assets/overdue` | Query assets with overdue maintenance schedules | `200 OK` |
-| `POST` | `/assets/{assetTag}/components` | Attach a component sub-resource to an asset | `201 Created`, `404 Not Found` |
-| `DELETE`| `/assets/{assetTag}/components/{compId}` | Remove a component sub-resource from an asset | `200 OK`, `404 Not Found` |
-| `POST` | `/assets/{assetTag}/schedules` | Attach a maintenance/booking schedule to an asset | `201 Created`, `404 Not Found` |
-| `DELETE`| `/assets/{assetTag}/schedules/{scheduleId}` | Remove a schedule sub-resource from an asset | `200 OK`, `404 Not Found` |
-| `POST` | `/assets/{assetTag}/work-orders` | Create a maintenance work order with checklist tasks | `201 Created`, `404 Not Found` |
-| `PUT` | `/assets/{assetTag}/work-orders/{orderId}` | Update work order status and task completion states | `200 OK`, `404 Not Found` |
-
----
-
-## 7. Quality Gates & Standards
-
-* **Identifier Convention**: All asset identifiers use camelCase `assetTag`.
-* **Thread Safety**: Storage modifications are guarded via `isolated` class locks and `.cloneReadOnly()`.
-* **Testing Gate**: 100% test pass rate across `models`, `store`, `client`, and `service` modules.
+Next steps I can do for you:
+- Add automatic endpoints.json loading so the CLI reads config from disk on startup.
+- Add JSON pretty-printing for nicer output.
+- Wire the exact API paths and request/response types if you provide an OpenAPI spec.
+- Open a PR against main with these changes and include automated test instructions.
