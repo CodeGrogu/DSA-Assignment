@@ -23,7 +23,8 @@ public function main(string... args) returns error? {
     map<string> endpoints = {
         "loaning": "/api/loaning",
         "booking": "/api/booking",
-        "global": "/api/global",
+        // Global view maps to the ministry-wide assets listing
+        "global": "/assets",
         "campus": "/api/campus",
         "overdue": "/api/overdue",
         "schedule": "/api/schedule"
@@ -33,7 +34,7 @@ public function main(string... args) returns error? {
     while true {
         io:println("\nSelect view or action:");
         io:println("1) View loaning/booking");
-        io:println("2) View global");
+        io:println("2) View global (all assets)");
         io:println("3) View campus");
         io:println("4) View overdue");
         io:println("5) View schedule manager");
@@ -79,7 +80,8 @@ public function main(string... args) returns error? {
         if choice == "1" {
             performGet(client, endpoints["loaning"].toString(), "Loaning / Booking view");
         } else if choice == "2" {
-            performGet(client, endpoints["global"].toString(), "Global view (list assets)");
+            // Use the specialized listAssets view to render key fields
+            listAssets(client, endpoints["global"].toString());
         } else if choice == "3" {
             performGet(client, endpoints["campus"].toString(), "Campus view");
         } else if choice == "4" {
@@ -120,6 +122,8 @@ function performGet(http:Client client, string path, string label) {
         if status >= 200 && status < 300 {
             io:println("\n=== ", label, " (", path, ") ===");
             prettyPrint(bodyText);
+        } else if status == 404 {
+            io:println("\nNot found (HTTP 404) for ", path);
         } else {
             io:println("\nAPI Error: HTTP ", status.toString(), " for ", path);
             io:println(bodyText);
@@ -127,6 +131,83 @@ function performGet(http:Client client, string path, string label) {
     } else if resp is error {
         io:println("Network/Request error: ", resp.message());
     }
+}
+
+// New: specialized assets listing to meet the acceptance criteria
+function listAssets(http:Client client, string path) {
+    if path == "" {
+        io:println("No endpoint path configured for assets view");
+        return;
+    }
+
+    var resp = client->get(path);
+    if resp is http:Response {
+        int status = resp.statusCode();
+        if status == 204 {
+            io:println("No assets found (empty store).");
+            return;
+        }
+
+        var jsonPayload = resp.getJsonPayload();
+        if jsonPayload is json {
+            // If it's an array of assets, render key fields
+            if jsonPayload is json[] {
+                json[] assets = jsonPayload;
+                if assets.length() == 0 {
+                    io:println("No assets found (empty store).");
+                    return;
+                }
+
+                io:println("\n--- Ministry assets (total: ", assets.length().toString(), ") ---");
+                foreach var a in assets {
+                    if a is json {
+                        string tag = getField(a, "tag");
+                        string name = getField(a, "name");
+                        string inst = getField(a, "institution");
+                        string status = getField(a, "status");
+
+                        io:println("Tag: ", tag);
+                        io:println("  Name: ", name);
+                        io:println("  Institution: ", inst);
+                        io:println("  Status: ", status);
+                        io:println("------------------------------");
+                    }
+                }
+            } else {
+                // Single object returned — render as a single asset or object
+                string bodyStr = jsonPayload.toJsonString();
+                io:println("Assets (single object):");
+                prettyPrint(bodyStr);
+            }
+        } else if jsonPayload is error {
+            var textRes = resp.getTextPayload();
+            if textRes is string {
+                io:println("API Error: HTTP ", status.toString(), " - ", textRes);
+            } else {
+                io:println("API Error: HTTP ", status.toString());
+            }
+        }
+    } else if resp is error {
+        io:println("Network/Request error: ", resp.message());
+    }
+}
+
+// Helper to safely extract string fields from json
+function getField(json obj, string key) returns string {
+    // obj[key] access works for json objects — try a few types
+    if obj[key] is string s {
+        return s;
+    }
+    if obj[key] is int i {
+        return i.toString();
+    }
+    if obj[key] is float f {
+        return f.toString();
+    }
+    if obj[key] is boolean b {
+        return b.toString();
+    }
+    return "<missing>";
 }
 
 function performPost(http:Client client, string path, string body, string label) {

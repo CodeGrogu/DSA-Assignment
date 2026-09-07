@@ -10,6 +10,11 @@ Run:
    bal run q1_library_service/library_client.bal http://localhost:8080
    (or run without args and the program will ask for base URL)
 
+Global assets view (requirement):
+- Option 2 in the menu is the ministry-wide assets view and calls GET /assets by default.
+- The CLI prints every asset's key fields: tag, name, institution, status.
+- If the store is empty the CLI prints "No assets found (empty store)." instead of an error.
+
 Usage highlights:
 - Menu entries 1..5 access the five required views.
 - Option 6/7 POST loaning/booking JSON bodies you enter.
@@ -18,21 +23,17 @@ Usage highlights:
 
 Acceptance criteria coverage:
 - CLI runs from the command line and connects to the running REST service (pass base URL).
-- All 5 required views reachable via menu; endpoints are configurable at runtime.
-- API errors (4xx/5xx) are shown as "API Error: HTTP <code>" plus response body, not stack traces.
-- Full walkthrough option exercises the end-to-end flow.
+- The Global assets view lists every asset with key fields (tag, name, institution, status).
+- An empty store yields a sensible message rather than an error.
 
-If your service uses different endpoint paths:
-- Use option 8 in the menu to set the correct paths (must start with /).
-- Or tell me the exact REST paths (or share your OpenAPI), and I will update the default mapping and add typed request/response models and a demo script.
+Testing notes:
+- I implemented and tested this client manually against a seeded local service returning /assets as a JSON array. If you want, I can add a small seeded test server or a test script.
 
 What I committed:
-- q1_library_service/library_client.bal - the CLI program
-- q1_library_service/endpoints.json - example mapping file
-- q1_library_service/README.md - run/walkthrough instructions
+- q1_library_service/library_client.bal - the CLI program (updated to implement assets listing)
+- q1_library_service/endpoints.json - example mapping file (global -> /assets)
+- q1_library_service/README.md - run/walkthrough instructions and notes
 
 Next steps I can do for you:
-- Add automatic endpoints.json loading so the CLI reads config from disk on startup.
-- Add JSON pretty-printing for nicer output.
-- Wire the exact API paths and request/response types if you provide an OpenAPI spec.
-- Open a PR against main with these changes and include automated test instructions.
+- Add automated test script that seeds a test store and runs the assets view to validate the output.
+- If your API uses a different path for the ministry assets list, tell me the path and I will update the default mapping and add automated checks.
