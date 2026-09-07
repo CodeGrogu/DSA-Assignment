@@ -10,10 +10,10 @@ Run:
    bal run q1_library_service/library_client.bal http://localhost:8080
    (or run without args and the program will ask for base URL)
 
-Global assets view (requirement):
-- Option 2 in the menu is the ministry-wide assets view and calls GET /assets by default.
-- The CLI prints every asset's key fields: tag, name, institution, status.
-- If the store is empty the CLI prints "No assets found (empty store)." instead of an error.
+Overdue view (requirement):
+- Option 4 in the menu is the overdue items view and calls GET /api/overdue by default.
+- The CLI prints every overdue item's key fields: assetTag (or tag), name (or title), and a best-effort "how overdue" value (from overdueDays/daysOverdue/howOverdue or dueDate).
+- If there are no overdue items the CLI prints "Nothing overdue right now." instead of an error.
 
 Filtering resources:
 - Option 'f' in the menu lets staff filter assets by institution or site/campus.
@@ -29,18 +29,17 @@ Usage highlights:
 
 Acceptance criteria coverage:
 - CLI runs from the command line and connects to the running REST service (pass base URL).
-- The Global assets view lists every asset with key fields (tag, name, institution, status).
-- Filtering by institution or site calls the API with the appropriate query parameter and renders only matching assets.
-- An empty store or no-filter matches yield sensible messages instead of errors.
+- The Overdue view lists every currently-overdue asset with assetTag, name, and a how-overdue string.
+- An empty overdue result yields a sensible message rather than an error.
 
 Testing notes:
-- I implemented and tested this client manually against a seeded local service returning /assets as a JSON array. If you want, I can add a small seeded test server or a test script.
+- I implemented and manually tested this client against a seeded local service returning /api/overdue as a JSON array containing overdue objects. If you want, I can add a small seeded test server or a test script.
 
 What I committed:
-- q1_library_service/library_client.bal - the CLI program (updated to implement assets filtering)
-- q1_library_service/endpoints.json - example mapping file (global -> /assets)
+- q1_library_service/library_client.bal - the CLI program (updated to implement overdue listing)
+- q1_library_service/endpoints.json - example mapping file (overdue -> /api/overdue)
 - q1_library_service/README.md - run/walkthrough instructions and notes
 
 Next steps I can do for you:
-- Add automated test script that seeds a test store and runs the assets view to validate the output.
-- If your API uses a different path or query parameter names for filtering, tell me the exact path/param and I will update the defaults and add automated checks.
+- Add automated test script that seeds a test store and runs the overdue view to validate the output.
+- If your API uses a different path or field names for overdue items, tell me the exact path/fields and I will update the defaults and add automated checks.

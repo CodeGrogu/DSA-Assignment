@@ -36,7 +36,7 @@ public function main(string... args) returns error? {
         io:println("1) View loaning/booking");
         io:println("2) View global (all assets)");
         io:println("3) View campus");
-        io:println("4) View overdue");
+        io:println("4) View overdue items");
         io:println("5) View schedule manager");
         io:println("6) Loan an item (POST)");
         io:println("7) Book an item (POST)");
@@ -86,7 +86,8 @@ public function main(string... args) returns error? {
         } else if choice == "3" {
             performGet(client, endpoints["campus"].toString(), "Campus view");
         } else if choice == "4" {
-            performGet(client, endpoints["overdue"].toString(), "Overdue view");
+            // Use the specialized overdue listing
+            listOverdue(client, endpoints["overdue"].toString());
         } else if choice == "5" {
             performGet(client, endpoints["schedule"].toString(), "Schedule manager view");
         } else if choice == "6" {
@@ -218,6 +219,93 @@ function listAssets(http:Client client, string path) {
     } else if resp is error {
         io:println("Network/Request error: ", resp.message());
     }
+}
+
+// New: list overdue items with assetTag, name, and how overdue
+function listOverdue(http:Client client, string path) {
+    if path == "" {
+        io:println("No endpoint path configured for overdue view");
+        return;
+    }
+
+    var resp = client->get(path);
+    if resp is http:Response {
+        int status = resp.statusCode();
+        if status == 204 {
+            io:println("Nothing overdue right now.");
+            return;
+        }
+
+        var jsonPayload = resp.getJsonPayload();
+        if jsonPayload is json {
+            if jsonPayload is json[] {
+                json[] items = jsonPayload;
+                if items.length() == 0 {
+                    io:println("Nothing overdue right now.");
+                    return;
+                }
+
+                io:println("\n--- Overdue items (total: ", items.length().toString(), ") ---");
+                foreach var it in items {
+                    if it is json {
+                        // assetTag might be named tag or assetTag
+                        string assetTag = getField(it, "assetTag");
+                        if assetTag == "<missing>" {
+                            assetTag = getField(it, "tag");
+                        }
+                        string name = getField(it, "name");
+                        if name == "<missing>" {
+                            name = getField(it, "title");
+                        }
+                        string overdue = getOverdue(it);
+
+                        io:println("AssetTag: ", assetTag);
+                        io:println("  Name: ", name);
+                        io:println("  Overdue: ", overdue);
+                        io:println("------------------------------");
+                    }
+                }
+            } else {
+                // Single object returned
+                string bodyStr = jsonPayload.toJsonString();
+                io:println("Overdue:");
+                prettyPrint(bodyStr);
+            }
+        } else if jsonPayload is error {
+            var textRes = resp.getTextPayload();
+            if textRes is string {
+                io:println("API Error: HTTP ", status.toString(), " - ", textRes);
+            } else {
+                io:println("API Error: HTTP ", status.toString());
+            }
+        }
+    } else if resp is error {
+        io:println("Network/Request error: ", resp.message());
+    }
+}
+
+// Inspect several possible fields to present "how overdue" information
+function getOverdue(json obj) returns string {
+    if obj["overdueDays"] is int od {
+        return od.toString() + " days";
+    }
+    if obj["daysOverdue"] is int dod {
+        return dod.toString() + " days";
+    }
+    if obj["overdue_by"] is int ob {
+        return ob.toString() + " days";
+    }
+    if obj["howOverdue"] is string hs {
+        return hs;
+    }
+    if obj["overdue"] is string ovs {
+        return ovs;
+    }
+    if obj["dueDate"] is string dd {
+        return "Due date: " + dd + " (overdue)";
+    }
+    // Fallback
+    return "<unknown>";
 }
 
 // Filter assets using a query parameter (institution or site)
@@ -395,7 +483,7 @@ function walkthrough(http:Client client, map<string> endpoints) {
 
     // 4) Check overdue view
     io:println("\nStep 4: Checking overdue view");
-    performGet(client, endpoints["overdue"].toString(), "Overdue view");
+    listOverdue(client, endpoints["overdue"].toString());
 
     // 5) Adjust schedule (generic PUT to schedule endpoint)
     io:println("\nStep 5: Adjust schedule (you'll be prompted for JSON body). Example: {\"assetId\":\"" + assetId + "\",\"nextAvailable\":\"2026-10-01T09:00:00Z\"}");
