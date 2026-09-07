@@ -41,6 +41,7 @@ public function main(string... args) returns error? {
         io:println("6) Loan an item (POST)");
         io:println("7) Book an item (POST)");
         io:println("w) Full walkthrough (list -> loan -> check overdue -> adjust schedule)");
+        io:println("f) Filter assets by institution or site");
         io:println("8) Edit endpoints mapping");
         io:println("q) Quit");
         string choice = check io:readln();
@@ -100,6 +101,33 @@ public function main(string... args) returns error? {
             performPost(client, endpoints["booking"].toString(), body, "Booking");
         } else if choice == "w" || choice == "W" {
             walkthrough(client, endpoints);
+        } else if choice == "f" || choice == "F" {
+            // Filter submenu
+            io:println("Filter by: 1) Institution  2) Site/Campus  (q to cancel)");
+            string sel = check io:readln();
+            sel = sel.strip();
+            if sel == "1" {
+                io:println("Enter institution name (exact match as in assets' institution field):");
+                string inst = check io:readln();
+                inst = inst.strip();
+                if inst == "" {
+                    io:println("No institution provided. Cancelled.");
+                } else {
+                    filterAssetsBy(client, endpoints["global"].toString(), "institution", inst);
+                }
+            } else if sel == "2" {
+                io:println("Enter site/campus name (exact match as in assets' site/campus field):");
+                string site = check io:readln();
+                site = site.strip();
+                if site == "" {
+                    io:println("No site provided. Cancelled.");
+                } else {
+                    // Try common query param names: site and campus
+                    filterAssetsBy(client, endpoints["global"].toString(), "site", site);
+                }
+            } else {
+                io:println("Filter cancelled.");
+            }
         } else {
             io:println("Unknown choice: ", choice);
         }
@@ -177,6 +205,66 @@ function listAssets(http:Client client, string path) {
                 // Single object returned — render as a single asset or object
                 string bodyStr = jsonPayload.toJsonString();
                 io:println("Assets (single object):");
+                prettyPrint(bodyStr);
+            }
+        } else if jsonPayload is error {
+            var textRes = resp.getTextPayload();
+            if textRes is string {
+                io:println("API Error: HTTP ", status.toString(), " - ", textRes);
+            } else {
+                io:println("API Error: HTTP ", status.toString());
+            }
+        }
+    } else if resp is error {
+        io:println("Network/Request error: ", resp.message());
+    }
+}
+
+// Filter assets using a query parameter (institution or site)
+function filterAssetsBy(http:Client client, string basePath, string filterKey, string filterValue) {
+    if basePath == "" {
+        io:println("No endpoint path configured for assets view");
+        return;
+    }
+    string encoded = urlEncode(filterValue);
+    string url = basePath + "?" + filterKey + "=" + encoded;
+    io:println("Calling ", url);
+
+    var resp = client->get(url);
+    if resp is http:Response {
+        int status = resp.statusCode();
+        if status == 204 {
+            io:println("No assets found for ", filterKey, "=", filterValue, ".");
+            return;
+        }
+
+        var jsonPayload = resp.getJsonPayload();
+        if jsonPayload is json {
+            if jsonPayload is json[] {
+                json[] assets = jsonPayload;
+                if assets.length() == 0 {
+                    io:println("No assets found for ", filterKey, "=", filterValue, ".");
+                    return;
+                }
+
+                io:println("\n--- Filtered assets (", filterKey, "=", filterValue, ") total: ", assets.length().toString(), " ---");
+                foreach var a in assets {
+                    if a is json {
+                        string tag = getField(a, "tag");
+                        string name = getField(a, "name");
+                        string inst = getField(a, "institution");
+                        string status = getField(a, "status");
+
+                        io:println("Tag: ", tag);
+                        io:println("  Name: ", name);
+                        io:println("  Institution: ", inst);
+                        io:println("  Status: ", status);
+                        io:println("------------------------------");
+                    }
+                }
+            } else {
+                string bodyStr = jsonPayload.toJsonString();
+                io:println("Result:");
                 prettyPrint(bodyStr);
             }
         } else if jsonPayload is error {
@@ -330,4 +418,13 @@ function prettyPrint(string raw) {
     } else {
         io:println(raw);
     }
+}
+
+// Very small URL encoder for basic safety (space -> %20, quotes -> %22)
+function urlEncode(string s) returns string {
+    string out = s.replace(" ", "%20");
+    out = out.replace("\"", "%22");
+    out = out.replace("#", "%23");
+    out = out.replace("%", "%25");
+    return out;
 }

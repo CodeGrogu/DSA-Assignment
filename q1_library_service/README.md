@@ -15,6 +15,12 @@ Global assets view (requirement):
 - The CLI prints every asset's key fields: tag, name, institution, status.
 - If the store is empty the CLI prints "No assets found (empty store)." instead of an error.
 
+Filtering resources:
+- Option 'f' in the menu lets staff filter assets by institution or site/campus.
+  - Choose 1) Institution and provide an institution name; the CLI will call GET /assets?institution=<value>
+  - Choose 2) Site/Campus and provide a site/campus name; the CLI will call GET /assets?site=<value>
+- If there are no matches the CLI prints a clear "No assets found for <filter>=<value>." message.
+
 Usage highlights:
 - Menu entries 1..5 access the five required views.
 - Option 6/7 POST loaning/booking JSON bodies you enter.
@@ -24,16 +30,17 @@ Usage highlights:
 Acceptance criteria coverage:
 - CLI runs from the command line and connects to the running REST service (pass base URL).
 - The Global assets view lists every asset with key fields (tag, name, institution, status).
-- An empty store yields a sensible message rather than an error.
+- Filtering by institution or site calls the API with the appropriate query parameter and renders only matching assets.
+- An empty store or no-filter matches yield sensible messages instead of errors.
 
 Testing notes:
 - I implemented and tested this client manually against a seeded local service returning /assets as a JSON array. If you want, I can add a small seeded test server or a test script.
 
 What I committed:
-- q1_library_service/library_client.bal - the CLI program (updated to implement assets listing)
+- q1_library_service/library_client.bal - the CLI program (updated to implement assets filtering)
 - q1_library_service/endpoints.json - example mapping file (global -> /assets)
 - q1_library_service/README.md - run/walkthrough instructions and notes
 
 Next steps I can do for you:
 - Add automated test script that seeds a test store and runs the assets view to validate the output.
-- If your API uses a different path for the ministry assets list, tell me the path and I will update the default mapping and add automated checks.
+- If your API uses a different path or query parameter names for filtering, tell me the exact path/param and I will update the defaults and add automated checks.
