@@ -42,6 +42,7 @@ public function main(string... args) returns error? {
         io:println("7) Book an item (POST)");
         io:println("w) Full walkthrough (list -> loan -> check overdue -> adjust schedule)");
         io:println("f) Filter assets by institution or site");
+        io:println("s) Schedules: add / remove for an asset");
         io:println("8) Edit endpoints mapping");
         io:println("q) Quit");
         string choice = check io:readln();
@@ -128,6 +129,27 @@ public function main(string... args) returns error? {
                 }
             } else {
                 io:println("Filter cancelled.");
+            }
+        } else if choice == "s" || choice == "S" {
+            // Schedule submenu
+            io:println("Schedules: 1) List schedules for asset  2) Add schedule  3) Remove schedule  (q to cancel)");
+            string sel = check io:readln();
+            sel = sel.strip();
+            if sel == "1" {
+                io:println("Enter assetId to list schedules for:");
+                string aid = check io:readln();
+                aid = aid.strip();
+                if aid == "" {
+                    io:println("No assetId provided. Cancelled.");
+                } else {
+                    listSchedulesForAsset(client, endpoints["schedule"].toString(), aid);
+                }
+            } else if sel == "2" {
+                addSchedule(client, endpoints["schedule"].toString());
+            } else if sel == "3" {
+                removeScheduleFlow(client, endpoints["schedule"].toString());
+            } else {
+                io:println("Schedule action cancelled.");
             }
         } else {
             io:println("Unknown choice: ", choice);
@@ -308,59 +330,202 @@ function getOverdue(json obj) returns string {
     return "<unknown>";
 }
 
-// Filter assets using a query parameter (institution or site)
-function filterAssetsBy(http:Client client, string basePath, string filterKey, string filterValue) {
+// List schedules for an asset
+function listSchedulesForAsset(http:Client client, string basePath, string assetId) {
     if basePath == "" {
-        io:println("No endpoint path configured for assets view");
+        io:println("No endpoint path configured for schedules view");
         return;
     }
-    string encoded = urlEncode(filterValue);
-    string url = basePath + "?" + filterKey + "=" + encoded;
+    string url = basePath + "?assetId=" + urlEncode(assetId);
     io:println("Calling ", url);
-
     var resp = client->get(url);
     if resp is http:Response {
         int status = resp.statusCode();
         if status == 204 {
-            io:println("No assets found for ", filterKey, "=", filterValue, ".");
+            io:println("No schedules found for asset ", assetId);
             return;
         }
-
         var jsonPayload = resp.getJsonPayload();
         if jsonPayload is json {
             if jsonPayload is json[] {
-                json[] assets = jsonPayload;
-                if assets.length() == 0 {
-                    io:println("No assets found for ", filterKey, "=", filterValue, ".");
+                json[] arr = jsonPayload;
+                if arr.length() == 0 {
+                    io:println("No schedules found for asset ", assetId);
                     return;
                 }
-
-                io:println("\n--- Filtered assets (", filterKey, "=", filterValue, ") total: ", assets.length().toString(), " ---");
-                foreach var a in assets {
-                    if a is json {
-                        string tag = getField(a, "tag");
-                        string name = getField(a, "name");
-                        string inst = getField(a, "institution");
-                        string status = getField(a, "status");
-
-                        io:println("Tag: ", tag);
-                        io:println("  Name: ", name);
-                        io:println("  Institution: ", inst);
-                        io:println("  Status: ", status);
-                        io:println("------------------------------");
+                io:println("\n--- Schedules for asset ", assetId, " (total: ", arr.length().toString(), ") ---");
+                int idx = 0;
+                foreach var s in arr {
+                    if s is json {
+                        string sid = getField(s, "id");
+                        if sid == "<missing>" {
+                            sid = getField(s, "scheduleId");
+                        }
+                        string when = getField(s, "when");
+                        if when == "<missing>" {
+                            when = getField(s, "nextAvailable");
+                        }
+                        io:println("[", idx.toString(), "] id=", sid, " when=", when);
+                        io:println("   raw: ", s.toJsonString());
+                        idx += 1;
                     }
                 }
             } else {
-                string bodyStr = jsonPayload.toJsonString();
-                io:println("Result:");
-                prettyPrint(bodyStr);
+                io:println("Schedules:");
+                prettyPrint(jsonPayload.toJsonString());
             }
-        } else if jsonPayload is error {
-            var textRes = resp.getTextPayload();
-            if textRes is string {
-                io:println("API Error: HTTP ", status.toString(), " - ", textRes);
+        }
+    } else if resp is error {
+        io:println("Network/Request error: ", resp.message());
+    }
+}
+
+// Add schedule flow
+function addSchedule(http:Client client, string basePath) {
+    if basePath == "" {
+        io:println("No endpoint path configured for schedules");
+        return;
+    }
+    io:println("Enter assetId to add schedule for:");
+    string assetId = check io:readln();
+    assetId = assetId.strip();
+    if assetId == "" {
+        io:println("Cancelled: no assetId provided.");
+        return;
+    }
+    io:println("Enter schedule JSON body (single-line). Example: {\"assetId\":\"", assetId, "\",\"when\":\"2026-10-01T09:00:00Z\"}");
+    string body = check io:readln();
+    body = body.strip();
+    if body == "" {
+        io:println("No body provided — cancelled.");
+        return;
+    }
+    var resp = client->post(basePath, body, contentType = "application/json");
+    if resp is http:Response {
+        int status = resp.statusCode();
+        var textRes = resp.getTextPayload();
+        string bodyText = "<no body>";
+        if textRes is string {
+            bodyText = textRes;
+        }
+        if status >= 200 && status < 300 {
+            io:println("Schedule added successfully (HTTP ", status.toString(), ")");
+            prettyPrint(bodyText);
+            // Re-list schedules for confirmation
+            listSchedulesForAsset(client, basePath, assetId);
+        } else {
+            io:println("API Error adding schedule: HTTP ", status.toString());
+            io:println(bodyText);
+        }
+    } else if resp is error {
+        io:println("Network/Request error: ", resp.message());
+    }
+}
+
+// Remove schedule flow: list schedules for an asset, pick by index, delete by id
+function removeScheduleFlow(http:Client client, string basePath) {
+    if basePath == "" {
+        io:println("No endpoint path configured for schedules");
+        return;
+    }
+    io:println("Enter assetId to remove a schedule for:");
+    string assetId = check io:readln();
+    assetId = assetId.strip();
+    if assetId == "" {
+        io:println("Cancelled: no assetId provided.");
+        return;
+    }
+
+    // Fetch schedules
+    string url = basePath + "?assetId=" + urlEncode(assetId);
+    var resp = client->get(url);
+    if resp is http:Response {
+        int status = resp.statusCode();
+        if status == 204 {
+            io:println("No schedules found for asset ", assetId);
+            return;
+        }
+        var jsonPayload = resp.getJsonPayload();
+        if jsonPayload is json {
+            if jsonPayload is json[] {
+                json[] arr = jsonPayload;
+                if arr.length() == 0 {
+                    io:println("No schedules found for asset ", assetId);
+                    return;
+                }
+                io:println("Select schedule to remove by number:");
+                int idx = 0;
+                foreach var s in arr {
+                    if s is json {
+                        string sid = getField(s, "id");
+                        if sid == "<missing>" {
+                            sid = getField(s, "scheduleId");
+                        }
+                        string when = getField(s, "when");
+                        if when == "<missing>" {
+                            when = getField(s, "nextAvailable");
+                        }
+                        io:println("[", idx.toString(), "] id=", sid, " when=", when);
+                        idx += 1;
+                    }
+                }
+                io:println("Enter number of schedule to remove (or q to cancel):");
+                string sel = check io:readln();
+                sel = sel.strip();
+                if sel == "q" || sel == "Q" {
+                    io:println("Cancelled.");
+                    return;
+                }
+                int choiceIndex = 0;
+                var parsed = int:fromString(sel);
+                if parsed is int {
+                    choiceIndex = parsed;
+                } else {
+                    io:println("Invalid selection. Cancelled.");
+                    return;
+                }
+                if choiceIndex < 0 || choiceIndex >= arr.length() {
+                    io:println("Selection out of range. Cancelled.");
+                    return;
+                }
+                json chosen = arr[choiceIndex];
+                string sid = getField(chosen, "id");
+                if sid == "<missing>" {
+                    sid = getField(chosen, "scheduleId");
+                }
+                if sid == "<missing>" {
+                    io:println("Cannot determine schedule id for selected item — removal requires schedule id. Cancelled.");
+                    return;
+                }
+                // Call DELETE basePath/{id}
+                string delUrl = basePath;
+                if delUrl.endsWith("/") {
+                    delUrl = delUrl.substring(0, delUrl.length() - 1);
+                }
+                delUrl = delUrl + "/" + urlEncode(sid);
+                var delResp = client->delete(delUrl);
+                if delResp is http:Response {
+                    int dstatus = delResp.statusCode();
+                    var dtext = delResp.getTextPayload();
+                    string dbody = "<no body>";
+                    if dtext is string {
+                        dbody = dtext;
+                    }
+                    if dstatus >= 200 && dstatus < 300 {
+                        io:println("Schedule removed (HTTP ", dstatus.toString(), ")");
+                        prettyPrint(dbody);
+                        // Re-list schedules to confirm
+                        listSchedulesForAsset(client, basePath, assetId);
+                    } else {
+                        io:println("API Error removing schedule: HTTP ", dstatus.toString());
+                        io:println(dbody);
+                    }
+                } else if delResp is error {
+                    io:println("Network/Request error: ", delResp.message());
+                }
+
             } else {
-                io:println("API Error: HTTP ", status.toString());
+                io:println("No schedules found for asset ", assetId);
             }
         }
     } else if resp is error {
