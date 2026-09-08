@@ -1,0 +1,147 @@
+syntax = "proto3";
+
+package rental;
+
+option java_package = "com.dsa.assignment.grpc.rental";
+option java_outer_classname = "RentalServiceProto";
+
+// Main Rental Service Definition spanning all 8 operations
+service RentalService {
+    // 1. Add new property listing (Host)
+    rpc add_property (AddPropertyRequest) returns (AddPropertyResponse);
+
+    // 2. Update existing property details (Host)
+    rpc update_property (UpdatePropertyRequest) returns (UpdatePropertyResponse);
+
+    // 3. Remove property and return remaining regional listings (Host)
+    rpc remove_property (RemovePropertyRequest) returns (RemovePropertyResponse);
+
+    // 4. Search property by assetTag with found/Not Available status (Guest/Host)
+    rpc search_property (SearchPropertyRequest) returns (SearchPropertyResponse);
+
+    // 5. Client streaming: register multiple users (Hosts/Guests) in one call
+    rpc create_users (stream User) returns (CreateUsersResponse);
+
+    // 6. Server streaming: browse available listings matching optional filters
+    rpc list_available_properties (ListAvailablePropertiesRequest) returns (stream Property);
+
+    // 7. Temporary cart reservation with date validation (Guest)
+    rpc book_property (BookPropertyRequest) returns (BookPropertyResponse);
+
+    // 8. Confirm booking with overlap check, cost calculation, and cart clear (Guest)
+    rpc confirm_booking (ConfirmBookingRequest) returns (ConfirmBookingResponse);
+}
+
+// Property Model (Compliant with assetTag convention)
+message Property {
+    string assetTag = 1;
+    string name = 2;
+    string location = 3;
+    string propertyType = 4;
+    double pricePerNight = 5;
+    string status = 6; // e.g., "AVAILABLE", "RENTED", "MAINTENANCE"
+    string hostId = 7;
+}
+
+message AddPropertyRequest {
+    string name = 1;
+    string location = 2;
+    string propertyType = 3;
+    double pricePerNight = 4;
+    string hostId = 5;
+}
+
+message AddPropertyResponse {
+    string assetTag = 1;
+    string status = 2;
+    string message = 3;
+}
+
+message UpdatePropertyRequest {
+    string assetTag = 1;
+    string name = 2;
+    string location = 3;
+    string propertyType = 4;
+    double pricePerNight = 5;
+    string status = 6;
+}
+
+message UpdatePropertyResponse {
+    bool success = 1;
+    string message = 2;
+    Property property = 3;
+}
+
+message RemovePropertyRequest {
+    string assetTag = 1;
+    string hostId = 2;
+    string location = 3;
+}
+
+message RemovePropertyResponse {
+    bool success = 1;
+    string message = 2;
+    repeated Property remainingProperties = 3;
+}
+
+message SearchPropertyRequest {
+    string assetTag = 1;
+}
+
+message SearchPropertyResponse {
+    bool found = 1;
+    string status = 2; // "Available", "Not Available"
+    Property property = 3;
+}
+
+// User Model & Streaming RPC Messages
+message User {
+    string userId = 1;
+    string name = 2;
+    string role = 3; // "HOST", "GUEST"
+    string email = 4;
+    string phoneNumber = 5;
+}
+
+message CreateUsersResponse {
+    int32 count = 1;
+    string message = 2;
+    bool success = 3;
+}
+
+// Listing Search & Server Streaming Messages
+message ListAvailablePropertiesRequest {
+    string location = 1;
+    double minPrice = 2;
+    double maxPrice = 3;
+    string propertyType = 4;
+}
+
+// Booking Messages
+message BookPropertyRequest {
+    string assetTag = 1;
+    string guestId = 2;
+    string checkInDate = 3;
+    string checkOutDate = 4;
+}
+
+message BookPropertyResponse {
+    bool success = 1;
+    string message = 2;
+    string bookingId = 3;
+    double estimatedCost = 4;
+}
+
+message ConfirmBookingRequest {
+    string bookingId = 1;
+    string guestId = 2;
+    string assetTag = 3;
+}
+
+message ConfirmBookingResponse {
+    bool success = 1;
+    string message = 2;
+    string bookingId = 3;
+    double totalCost = 4;
+    string status = 5;
+}
