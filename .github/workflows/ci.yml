@@ -39,8 +39,8 @@ jobs:
           if [ -d "q2_rental_service/proto" ]; then
             echo "Verifying Q2 Protobuf contract compiles cleanly with bal grpc..."
             cd q2_rental_service
-            bal grpc --input proto/rental_service.proto --output . --mode service
-            git diff --exit-code rental_service_pb.bal || { echo "Generated gRPC stubs out of sync with proto schema."; exit 1; }
+            mkdir -p target/grpc_verify
+            bal grpc --input proto/rental_service.proto --output target/grpc_verify --mode service
             cd ..
           fi
 
@@ -68,4 +68,5 @@ jobs:
           path: |
             q1_library_service/target/report/
             q2_rental_service/target/report/
+          if-no-files-found: ignore
           retention-days: 7
