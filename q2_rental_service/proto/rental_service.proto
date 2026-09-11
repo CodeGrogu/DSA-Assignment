@@ -7,32 +7,35 @@ option java_outer_classname = "RentalServiceProto";
 
 // Main Rental Service Definition spanning all 8 operations
 service RentalService {
-    // 1. Add new property listing (Host)
+    // 1. Add new property listing (Host) - Issue #33
     rpc add_property (AddPropertyRequest) returns (AddPropertyResponse);
 
-    // 2. Update existing property details (Host)
+    // 2. Update existing property details (Host) - Issue #33
     rpc update_property (UpdatePropertyRequest) returns (UpdatePropertyResponse);
 
-    // 3. Remove property and return remaining regional listings (Host)
+    // 3. Remove property and return remaining regional listings (Host) - Issue #33
     rpc remove_property (RemovePropertyRequest) returns (RemovePropertyResponse);
 
-    // 4. Search property by assetTag with found/Not Available status (Guest/Host)
+    // 4. Search property by assetTag with found/Not Available status (Guest/Host) - Issue #33
     rpc search_property (SearchPropertyRequest) returns (SearchPropertyResponse);
 
-    // 5. Client streaming: register multiple users (Hosts/Guests) in one call
+    // 5. Client streaming: register multiple users (Hosts/Guests) in one call - Issue #34
     rpc create_users (stream User) returns (CreateUsersResponse);
 
-    // 6. Server streaming: browse available listings matching optional filters
+    // 6. Server streaming: browse available listings matching optional filters - Issue #35
     rpc list_available_properties (ListAvailablePropertiesRequest) returns (stream Property);
 
-    // 7. Temporary cart reservation with date validation (Guest)
+    // 7. Temporary cart reservation with date validation (Guest) - Issue #36
     rpc book_property (BookPropertyRequest) returns (BookPropertyResponse);
 
-    // 8. Confirm booking with overlap check, cost calculation, and cart clear (Guest)
+    // 8. Confirm booking with overlap check, cost calculation, and cart clear (Guest) - Issue #36
     rpc confirm_booking (ConfirmBookingRequest) returns (ConfirmBookingResponse);
 }
 
-// Property Model (Compliant with assetTag convention)
+// ==========================================
+// Issue #33: Property Model & Management RPCs
+// ==========================================
+
 message Property {
     string assetTag = 1;
     string name = 2;
@@ -94,7 +97,10 @@ message SearchPropertyResponse {
     Property property = 3;
 }
 
-// User Model & Streaming RPC Messages
+// ==========================================
+// Issue #34: User Model & Streaming Registration
+// ==========================================
+
 message User {
     string userId = 1;
     string name = 2;
@@ -109,7 +115,10 @@ message CreateUsersResponse {
     bool success = 3;
 }
 
-// Listing Search & Server Streaming Messages
+// ==========================================
+// Issue #35: Available Properties Streaming
+// ==========================================
+
 message ListAvailablePropertiesRequest {
     string location = 1;
     double minPrice = 2;
@@ -117,7 +126,21 @@ message ListAvailablePropertiesRequest {
     string propertyType = 4;
 }
 
-// Booking Messages
+// ==========================================
+// Issue #36: Booking Model & Reservation RPCs
+// ==========================================
+
+// Standalone Booking resource model for downstream reservation tracking
+message Booking {
+    string bookingId = 1;
+    string assetTag = 2;   // Property identifier
+    string guestId = 3;    // Guest identifier for per-guest cart / state
+    string checkInDate = 4;
+    string checkOutDate = 5;
+    double totalCost = 6;
+    string status = 7;     // e.g. "PENDING", "CONFIRMED", "CANCELLED"
+}
+
 message BookPropertyRequest {
     string assetTag = 1;
     string guestId = 2;
@@ -130,6 +153,7 @@ message BookPropertyResponse {
     string message = 2;
     string bookingId = 3;
     double estimatedCost = 4;
+    Booking booking = 5;
 }
 
 message ConfirmBookingRequest {
@@ -144,4 +168,5 @@ message ConfirmBookingResponse {
     string bookingId = 3;
     double totalCost = 4;
     string status = 5;
+    Booking booking = 6;
 }

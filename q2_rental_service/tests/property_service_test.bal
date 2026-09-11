@@ -222,3 +222,63 @@ isolated function testListAvailablePropertiesFilters() returns error? {
     Property[] available = store.listAvailableProperties(filter);
     test:assertEquals(available.length(), 2, "Should return 2 available properties under 1000");
 }
+
+@test:Config {
+    groups: ["proto", "user", "issue34"]
+}
+isolated function testUserModelCreationAndRoleDistinction() {
+    User hostUser = {
+        userId: "USR-001",
+        name: "Alice Host",
+        role: "HOST",
+        email: "alice@example.com",
+        phoneNumber: "+264811234567"
+    };
+    User guestUser = {
+        userId: "USR-002",
+        name: "Bob Guest",
+        role: "GUEST",
+        email: "bob@example.com",
+        phoneNumber: "+264819876543"
+    };
+
+    test:assertEquals(hostUser.role, "HOST", "User model must distinguish Host role");
+    test:assertEquals(guestUser.role, "GUEST", "User model must distinguish Guest role");
+    test:assertEquals(hostUser.userId, "USR-001");
+    test:assertEquals(guestUser.userId, "USR-002");
+}
+
+@test:Config {
+    groups: ["proto", "booking", "issue36"]
+}
+isolated function testBookingModelAndResponseCarriesGuestIdentifier() {
+    Booking booking = {
+        bookingId: "BOOK-2026-001",
+        assetTag: "PROP-1001",
+        guestId: "GUEST-555",
+        checkInDate: "2026-10-01",
+        checkOutDate: "2026-10-05",
+        totalCost: 3400.0,
+        status: "CONFIRMED"
+    };
+
+    test:assertEquals(booking.bookingId, "BOOK-2026-001");
+    test:assertEquals(booking.assetTag, "PROP-1001");
+    test:assertEquals(booking.guestId, "GUEST-555", "Booking must carry guest identifier for cart state");
+    test:assertEquals(booking.totalCost, 3400.0);
+    test:assertEquals(booking.status, "CONFIRMED");
+
+    ConfirmBookingResponse confirmResp = {
+        success: true,
+        message: "Booking confirmed successfully.",
+        bookingId: booking.bookingId,
+        totalCost: booking.totalCost,
+        status: "CONFIRMED",
+        booking: booking
+    };
+
+    test:assertTrue(confirmResp.success);
+    test:assertEquals(confirmResp.totalCost, 3400.0);
+    test:assertEquals(confirmResp.booking.guestId, "GUEST-555");
+}
+

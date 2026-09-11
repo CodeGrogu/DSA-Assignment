@@ -116,11 +116,22 @@ isolated service "RentalService" on ep {
     # + return - BookPropertyResponse
     isolated remote function book_property(BookPropertyRequest value) returns BookPropertyResponse|error {
         log:printInfo(string `Received book_property RPC request for '${value.assetTag}' by '${value.guestId}'`);
+        string bookingId = string `TEMP-${value.assetTag}-${value.guestId}`;
+        Booking booking = {
+            bookingId: bookingId,
+            assetTag: value.assetTag,
+            guestId: value.guestId,
+            checkInDate: value.checkInDate,
+            checkOutDate: value.checkOutDate,
+            totalCost: 0.0,
+            status: "PENDING"
+        };
         return {
             success: true,
             message: "Temporary booking reservation placed.",
-            bookingId: string `TEMP-${value.assetTag}-${value.guestId}`,
-            estimatedCost: 0.0
+            bookingId: bookingId,
+            estimatedCost: 0.0,
+            booking: booking
         };
     }
 
@@ -130,12 +141,22 @@ isolated service "RentalService" on ep {
     # + return - ConfirmBookingResponse
     isolated remote function confirm_booking(ConfirmBookingRequest value) returns ConfirmBookingResponse|error {
         log:printInfo(string `Received confirm_booking RPC request for booking '${value.bookingId}'`);
+        Booking booking = {
+            bookingId: value.bookingId,
+            assetTag: value.assetTag,
+            guestId: value.guestId,
+            checkInDate: "",
+            checkOutDate: "",
+            totalCost: 0.0,
+            status: "CONFIRMED"
+        };
         return {
             success: true,
             message: "Booking confirmed successfully.",
             bookingId: value.bookingId,
             totalCost: 0.0,
-            status: "CONFIRMED"
+            status: "CONFIRMED",
+            booking: booking
         };
     }
 
