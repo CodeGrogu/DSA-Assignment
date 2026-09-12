@@ -42,6 +42,13 @@ isolated service "RentalService" on ep {
     isolated remote function update_property(UpdatePropertyRequest value) returns UpdatePropertyResponse|error {
         log:printInfo(string `Received update_property RPC request for assetTag '${value.assetTag}'`);
 
+        if value.assetTag.trim().length() == 0 {
+            return error grpc:InvalidArgumentError("Asset tag must not be empty.");
+        }
+        if value.pricePerNight < 0.0 {
+            return error grpc:InvalidArgumentError("Price per night must be non-negative.");
+        }
+
         Property|error result = self.store.updateProperty(value);
         if result is error {
             log:printWarn(string `Update failed for assetTag '${value.assetTag}': ${result.message()}`);
