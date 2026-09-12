@@ -31,8 +31,10 @@ description: |-
   ### Automated Test Assertions
   1. **Status Code Check**: Asserts HTTP `201 Created` or `200 OK`.
   2. **Component Registration**: Verifies that `compId` is registered and returned.
+order: 10000
 scripts:
   - type: afterResponse
+    language: text/javascript
     code: |-
       pm.test("Status code is 200 or 201", function () {
           pm.expect(pm.response.code).to.be.oneOf([200, 201]);

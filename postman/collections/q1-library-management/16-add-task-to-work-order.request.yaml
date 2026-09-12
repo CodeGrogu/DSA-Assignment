@@ -1,0 +1,49 @@
+$kind: http-request
+name: 16. Add Task to Work Order
+method: POST
+url: "{{base_url}}:{{port}}/assets/{{assetTag}}/work-orders/{{orderId}}/tasks"
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: Accept
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "taskId": "TSK-02",
+      "description": "Inspect electrical wiring and calibrate sensors",
+      "completed": false
+    }
+description: |-
+  ### Endpoint Overview
+  Attaches an actionable sub-task to an existing active work order.
+
+  ---
+  ### HTTP Specification
+  - **Method**: `POST`
+  - **URL**: `{{base_url}}:{{port}}/assets/{{assetTag}}/work-orders/{{orderId}}/tasks`
+  - **Headers**:
+    - `Content-Type`: `application/json`
+    - `Accept`: `application/json`
+
+  ---
+  ### Automated Test Assertions
+  1. **Status Code Check**: Asserts HTTP `201 Created`.
+  2. **Task Validation**: Verifies `taskId` equals `TSK-02` and `completed` is initially false.
+order: 16000
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Status code is 201", function () {
+          pm.expect(pm.response.code).to.equal(201);
+      });
+      pm.test("Created task matches payload", function () {
+          var jsonData = pm.response.json();
+          pm.expect(jsonData.taskId).to.equal("TSK-02");
+          pm.expect(jsonData.completed).to.be.false;
+      });
+      if (pm.response.code === 201) {
+          pm.environment.set("taskId", "TSK-02");
+      }

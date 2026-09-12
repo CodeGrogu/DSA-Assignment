@@ -35,8 +35,10 @@ description: |-
   ### Automated Test Assertions
   1. **Status Code Check**: Asserts HTTP status code is `200 OK`.
   2. **Catalog Contract**: Verifies `service`, `version`, and `endpoints` array properties are present.
+order: 2000
 scripts:
   - type: afterResponse
+    language: text/javascript
     code: |-
       pm.test("Status code is 200", function () {
           pm.expect(pm.response.code).to.equal(200);

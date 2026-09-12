@@ -28,8 +28,10 @@ description: |-
   ### Automated Test Assertions
   1. **Status Code Check**: Asserts HTTP `200 OK`.
   2. **Filtering Accuracy**: Verifies all returned assets match the specified institution and site.
+order: 7000
 scripts:
   - type: afterResponse
+    language: text/javascript
     code: |-
       pm.test("Status code is 200", function () {
           pm.expect(pm.response.code).to.equal(200);

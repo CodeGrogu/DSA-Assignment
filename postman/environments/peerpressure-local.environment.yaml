@@ -18,3 +18,12 @@ values:
   - key: orderId
     value: WO-101
     enabled: true
+  - key: taskId
+    value: TSK-02
+    enabled: true
+  - key: grpc_host
+    value: localhost
+    enabled: true
+  - key: grpc_port
+    value: "9090"
+    enabled: true

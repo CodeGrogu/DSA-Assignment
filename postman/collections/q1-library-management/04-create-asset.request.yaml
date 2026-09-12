@@ -63,8 +63,10 @@ description: |-
   1. **Status Code Check**: Asserts HTTP `201 Created` or `200 OK`.
   2. **Primary Key Validation**: Asserts `assetTag` exists in the response.
   3. **Dynamic Environment Variable Setting**: Persists `assetTag` into `{{assetTag}}` for downstream tests.
+order: 4000
 scripts:
   - type: afterResponse
+    language: text/javascript
     code: |-
       pm.test("Status code is 201 or 200", function () {
           pm.expect(pm.response.code).to.be.oneOf([200, 201]);
