@@ -249,6 +249,44 @@ isolated function testUserModelCreationAndRoleDistinction() {
 }
 
 @test:Config {
+    groups: ["store", "user", "streaming", "issue41"]
+}
+isolated function testAddUserAndListUsers() returns error? {
+    PropertyStore store = new ();
+
+    User hostUser = {
+        userId: "USR-100",
+        name: "Alice Host",
+        role: "HOST",
+        email: "alice@example.com",
+        phoneNumber: "+264811234567"
+    };
+    User guestUser = {
+        userId: "USR-101",
+        name: "Bob Guest",
+        role: "GUEST",
+        email: "bob@example.com",
+        phoneNumber: "+264819876543"
+    };
+
+    User addedHost = store.addUser(hostUser);
+    User addedGuest = store.addUser(guestUser);
+
+    test:assertEquals(addedHost.userId, "USR-100");
+    test:assertEquals(addedGuest.role, "GUEST");
+
+    User? fetched = store.getUser("USR-100");
+    test:assertTrue(fetched is User, "User should be stored and retrievable by userId");
+    if fetched is User {
+        test:assertEquals(fetched.name, "Alice Host");
+        test:assertEquals(fetched.email, "alice@example.com");
+    }
+
+    User[] allUsers = store.getAllUsers();
+    test:assertEquals(allUsers.length(), 2, "Store should retain both registered users");
+}
+
+@test:Config {
     groups: ["proto", "booking", "issue36"]
 }
 isolated function testBookingModelAndResponseCarriesGuestIdentifier() {
