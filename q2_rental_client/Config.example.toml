@@ -1,0 +1,13 @@
+# ==============================================================================
+# Q2 Vacation Property Rental Service Client - Configuration Template
+# Copy this file to Config.toml for local execution:
+#   cp Config.example.toml Config.toml
+# ==============================================================================
+
+[peerpressure.q2_rental_client]
+# Target gRPC server endpoint URL for RentalService
+serviceUrl = "http://localhost:9090"
+
+# gRPC RPC request timeout in seconds (default: 10.0 seconds)
+# Prevents client threads from hanging indefinitely during network partitions or server hangs
+rpcTimeout = 10.0
