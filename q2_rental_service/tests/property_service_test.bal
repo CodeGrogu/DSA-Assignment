@@ -1,3 +1,4 @@
+import ballerina/grpc;
 import ballerina/test;
 
 @test:Config {
@@ -249,41 +250,31 @@ isolated function testUserModelCreationAndRoleDistinction() {
 }
 
 @test:Config {
-    groups: ["store", "user", "streaming", "issue41"]
+    groups: ["streaming", "issue41"]
 }
-isolated function testAddUserAndListUsers() returns error? {
-    PropertyStore store = new ();
+isolated function testCreateUsersStreamsMoreThanThreeUsers() returns error? {
+    RentalServiceClient rentalClient = check new ("http://localhost:9090");
+    Create_usersStreamingClient userStream = check rentalClient->create_users();
+    int expectedCount = 5;
 
-    User hostUser = {
-        userId: "USR-100",
-        name: "Alice Host",
-        role: "HOST",
-        email: "alice@example.com",
-        phoneNumber: "+264811234567"
-    };
-    User guestUser = {
-        userId: "USR-101",
-        name: "Bob Guest",
-        role: "GUEST",
-        email: "bob@example.com",
-        phoneNumber: "+264819876543"
-    };
-
-    User addedHost = store.addUser(hostUser);
-    User addedGuest = store.addUser(guestUser);
-
-    test:assertEquals(addedHost.userId, "USR-100");
-    test:assertEquals(addedGuest.role, "GUEST");
-
-    User? fetched = store.getUser("USR-100");
-    test:assertTrue(fetched is User, "User should be stored and retrievable by userId");
-    if fetched is User {
-        test:assertEquals(fetched.name, "Alice Host");
-        test:assertEquals(fetched.email, "alice@example.com");
+    foreach int index in 1 ... expectedCount {
+        User user = {
+            userId: string `USR-${index}`,
+            name: string `Test User ${index}`,
+            role: index == 1 ? "HOST" : "GUEST",
+            email: string `user${index}@example.com`,
+            phoneNumber: string `+2648100000${index}`
+        };
+        check userStream->sendUser(user);
     }
 
-    User[] allUsers = store.getAllUsers();
-    test:assertEquals(allUsers.length(), 2, "Store should retain both registered users");
+    check userStream->complete();
+    CreateUsersResponse|grpc:Error? response = check userStream->receiveCreateUsersResponse();
+    test:assertTrue(response is CreateUsersResponse, "The stream should return one final response");
+    if response is CreateUsersResponse {
+        test:assertEquals(response.count, expectedCount);
+        test:assertTrue(response.success);
+    }
 }
 
 @test:Config {
