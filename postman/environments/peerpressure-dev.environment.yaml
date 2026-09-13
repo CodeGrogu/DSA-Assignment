@@ -1,20 +1,20 @@
 name: PeerPressure Dev
 values:
   - key: base_url
-    value: http://localhost
-    enabled: true
+    value: 'http://localhost'
   - key: port
-    value: "9090"
-    enabled: true
+    value: '9090'
   - key: assetTag
     value: TAG-TEST-001
-    enabled: true
   - key: compId
     value: COMP-01
-    enabled: true
   - key: scheduleId
     value: SCH-01
-    enabled: true
   - key: orderId
     value: WO-101
-    enabled: true
+  - key: taskId
+    value: TSK-02
+  - key: grpc_host
+    value: localhost
+  - key: grpc_port
+    value: '9090'

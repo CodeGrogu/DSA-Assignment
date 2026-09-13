@@ -23,8 +23,10 @@ description: |-
   1. **Status Code Check**: Asserts HTTP `200 OK`.
   2. **Identity Verification**: Verifies returned `assetTag` matches the requested environment variable.
   3. **Record Integrity**: Validates `name`, `status`, and `institution` fields are present.
+order: 5000
 scripts:
   - type: afterResponse
+    language: text/javascript
     code: |-
       pm.test("Status code is 200", function () {
           pm.expect(pm.response.code).to.equal(200);

@@ -18,8 +18,21 @@ body:
       "site": "Main Campus Library",
       "status": "LOANED_OUT",
       "dateAcquired": "2026-01-15",
-      "components": [],
-      "schedules": [],
+      "components": [
+        {
+          "compId": "COMP-01",
+          "name": "Hardcover Binding",
+          "description": "Reinforced library binding"
+        }
+      ],
+      "schedules": [
+        {
+          "scheduleId": "SCH-01",
+          "dueDate": "2026-12-01",
+          "scheduleType": "INSPECTION",
+          "details": "Annual physical condition check"
+        }
+      ],
       "workOrders": []
     }
 description: |-
@@ -38,8 +51,10 @@ description: |-
   ### Automated Test Assertions
   1. **Status Code Check**: Asserts HTTP `200 OK`.
   2. **Field Mutation**: Verifies that updated properties (e.g. `LOANED_OUT`) are reflected in the response.
+order: 6000
 scripts:
   - type: afterResponse
+    language: text/javascript
     code: |-
       pm.test("Status code is 200", function () {
           pm.expect(pm.response.code).to.equal(200);

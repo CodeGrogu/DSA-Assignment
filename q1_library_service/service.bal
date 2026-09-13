@@ -45,7 +45,10 @@ service / on httpListener {
                 "/assets/{assetTag}/schedules",
                 "/assets/{assetTag}/schedules/{scheduleId}",
                 "/assets/{assetTag}/work-orders",
-                "/assets/{assetTag}/work-orders/{orderId}"
+                "/assets/{assetTag}/work-orders/{orderId}",
+                "/assets/{assetTag}/work-orders/{orderId}/tasks",
+                "/assets/{assetTag}/work-orders/{orderId}/tasks/{taskId}",
+                "/assets/{assetTag}/work-orders/{orderId}/close"
             ]
         };
     }
@@ -66,20 +69,36 @@ service / on httpListener {
 
     # Registers a new asset in the system.
     # + payload - Complete asset record payload
-    # + return - Created asset record (201) or error response (400)
-    resource function post assets(@http:Payload models:Asset payload) returns http:Created|http:BadRequest {
+    # + return - Created asset record (201),Bad request (400) or Conflict(409)
+    resource function post assets(@http:Payload models:Asset payload) returns http:Created|http:BadRequest|http:Conflict {
         error? result = store:addAsset(payload);
+
         if result is error {
+            string msg = result.message();
+
+            if msg.includes("already exists") {
+                return <http:Conflict>{
+                    body: {
+                        timestamp: time:utcToString(time:utcNow()),
+                        status: 409,
+                        reason: "Conflict",
+                        message: msg,
+                        path: "/assets"
+                    }
+                };
+            }
+
             return <http:BadRequest>{
                 body: {
                     timestamp: time:utcToString(time:utcNow()),
                     status: 400,
                     reason: "Bad Request",
-                    message: result.message(),
+                    message: msg,
                     path: "/assets"
                 }
             };
         }
+
         return <http:Created>{body: payload.toJson()};
     }
 
@@ -165,11 +184,22 @@ service / on httpListener {
                 active.push(wo);
             }
         }
+        json[] bookingSchedules = [];
+        foreach models:Schedule schedule in asset.schedules {
+            if schedule.scheduleType == "BOOKING" {
+                bookingSchedules.push({
+                    scheduleId: schedule.scheduleId,
+                    bookedFor: schedule.details,
+                    until: schedule.dueDate
+                });
+            }
+        }
         return {
             assetTag: asset.assetTag,
             name: asset.name,
             status: asset.status,
             schedules: asset.schedules.toJson(),
+            bookingSchedules: bookingSchedules,
             activeWorkOrders: active.toJson()
         };
     }
@@ -177,8 +207,28 @@ service / on httpListener {
     # Retrieves all assets with overdue maintenance or booking schedules.
     # + currentDate - Optional ISO comparison date (defaults to current UTC date)
     # + return - Array of assets with overdue schedules
-    resource function get assets/overdue(string? currentDate) returns json {
-        string dateToCompare = currentDate ?: "2026-12-31";
+    resource function get assets/overdue(string? currentDate) returns json|http:BadRequest {
+        string dateToCompare;
+
+        if currentDate is string {
+            // Validate basic ISO YYYY-MM-DD date length
+            if currentDate.length() < 10 {
+                return <http:BadRequest>{
+                    body: {
+                        timestamp: time:utcToString(time:utcNow()),
+                        status: 400,
+                        reason: "Bad Request",
+                        message: "Invalid date format. Expected 'YYYY-MM-DD'.",
+                        path: "/assets/overdue"
+                    }
+                };
+            }
+            dateToCompare = currentDate.substring(0, 10);
+        } else {
+            // Dynamically extract YYYY-MM-DD from current UTC time
+            dateToCompare = time:utcToString(time:utcNow()).substring(0, 10);
+        }
+
         return store:getOverdueAssets(dateToCompare).toJson();
     }
 
@@ -322,5 +372,137 @@ service / on httpListener {
             message: string `Institution '${id}' removed successfully.`,
             id: id
         };
+    # Adds a sub-task to an existing work order.
+    # + assetTag - Unique asset tag
+    # + orderId - Unique work order identifier
+    # + task - New task payload
+    # + return - Created task (201) or error response
+    resource function post assets/[string assetTag]/work\-orders/[string orderId]/tasks(@http:Payload models:Task task) returns http:Created|http:NotFound|http:BadRequest {
+        models:Asset? asset = store:getAsset(assetTag);
+        if asset is () {
+            return <http:NotFound>{body: {message: string `Asset with tag '${assetTag}' not found.`}};
+        }
+        int? idx = ();
+        foreach int i in 0 ..< asset.workOrders.length() {
+            if asset.workOrders[i].orderId == orderId {
+                idx = i;
+                break;
+            }
+        }
+        if idx is () {
+            return <http:NotFound>{body: {message: string `Work order '${orderId}' not found on asset '${assetTag}'.`}};
+        }
+        models:WorkOrder wo = asset.workOrders[idx];
+        foreach models:Task t in wo.tasks {
+            if t.taskId == task.taskId {
+                return <http:BadRequest>{body: {message: string `Task '${task.taskId}' already exists on work order '${orderId}'.`}};
+            }
+        }
+        models:Task[] updatedTasks = [];
+        foreach models:Task t in wo.tasks {
+            updatedTasks.push(t);
+        }
+        updatedTasks.push(task);
+
+        models:WorkOrder updatedWo = {
+            orderId: wo.orderId,
+            status: wo.status,
+            description: wo.description,
+            compId: wo.compId,
+            tasks: updatedTasks
+        };
+        error? result = store:updateWorkOrder(assetTag, updatedWo);
+        if result is error {
+            return <http:BadRequest>{body: {message: result.message()}};
+        }
+        return <http:Created>{body: task.toJson()};
+    }
+
+    # Updates a sub-task's completion status within a work order.
+    # + assetTag - Unique asset tag
+    # + orderId - Unique work order identifier
+    # + taskId - Unique task identifier
+    # + payload - New completion state
+    # + return - Updated work order (200) or error response
+    resource function patch assets/[string assetTag]/work\-orders/[string orderId]/tasks/[string taskId](@http:Payload record {|boolean completed;|} payload) returns json|http:NotFound {
+        models:Asset? asset = store:getAsset(assetTag);
+        if asset is () {
+            return <http:NotFound>{body: {message: string `Asset with tag '${assetTag}' not found.`}};
+        }
+        int? woIdx = ();
+        foreach int i in 0 ..< asset.workOrders.length() {
+            if asset.workOrders[i].orderId == orderId {
+                woIdx = i;
+                break;
+            }
+        }
+        if woIdx is () {
+            return <http:NotFound>{body: {message: string `Work order '${orderId}' not found on asset '${assetTag}'.`}};
+        }
+        models:WorkOrder wo = asset.workOrders[woIdx];
+        models:Task[] updatedTasks = [];
+        boolean found = false;
+        foreach models:Task t in wo.tasks {
+            if t.taskId == taskId {
+                updatedTasks.push({taskId: t.taskId, description: t.description, completed: payload.completed});
+                found = true;
+            } else {
+                updatedTasks.push(t);
+            }
+        }
+        if !found {
+            return <http:NotFound>{body: {message: string `Task '${taskId}' not found on work order '${orderId}'.`}};
+        }
+        models:WorkOrder updatedWo = {
+            orderId: wo.orderId,
+            status: wo.status,
+            description: wo.description,
+            compId: wo.compId,
+            tasks: updatedTasks
+        };
+        error? result = store:updateWorkOrder(assetTag, updatedWo);
+        if result is error {
+            return <http:NotFound>{body: {message: result.message()}};
+        }
+        return updatedWo.toJson();
+    }
+
+    # Closes a work order once all its tasks are completed.
+    # + assetTag - Unique asset tag
+    # + orderId - Unique work order identifier
+    # + return - Closed work order (200) or error response
+    resource function post assets/[string assetTag]/work\-orders/[string orderId]/close() returns json|http:NotFound|http:BadRequest {
+        models:Asset? asset = store:getAsset(assetTag);
+        if asset is () {
+            return <http:NotFound>{body: {message: string `Asset with tag '${assetTag}' not found.`}};
+        }
+        int? idx = ();
+        foreach int i in 0 ..< asset.workOrders.length() {
+            if asset.workOrders[i].orderId == orderId {
+                idx = i;
+                break;
+            }
+        }
+        if idx is () {
+            return <http:NotFound>{body: {message: string `Work order '${orderId}' not found on asset '${assetTag}'.`}};
+        }
+        models:WorkOrder wo = asset.workOrders[idx];
+        foreach models:Task t in wo.tasks {
+            if !t.completed {
+                return <http:BadRequest>{body: {message: string `Cannot close work order '${orderId}': task '${t.taskId}' is not completed.`}};
+            }
+        }
+        models:WorkOrder closedWo = {
+            orderId: wo.orderId,
+            status: "CLOSED",
+            description: wo.description,
+            compId: wo.compId,
+            tasks: wo.tasks
+        };
+        error? result = store:updateWorkOrder(assetTag, closedWo);
+        if result is error {
+            return <http:BadRequest>{body: {message: result.message()}};
+        }
+        return closedWo.toJson();
     }
 }

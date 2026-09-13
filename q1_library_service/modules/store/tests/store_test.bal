@@ -60,6 +60,12 @@ function testStoreBasicCrud() returns error? {
 }
 
 @test:Config {}
+function testGetAllAssetsOnEmptyStore() {
+    models:Asset[] assets = getAllAssets();
+    test:assertEquals(assets.length(), 0);
+}
+
+@test:Config {}
 function testDuplicateAssetTagRejection() returns error? {
     models:Asset asset1 = createTestAsset("TAG-DUP-01");
     check addAsset(asset1);
@@ -152,6 +158,9 @@ function testOverdueAssetsDetection() returns error? {
     models:Asset[] overdueList = getOverdueAssets("2026-08-16");
     test:assertEquals(overdueList.length(), 1);
     test:assertEquals(overdueList[0].assetTag, "TAG-OVERDUE-01");
+    test:assertEquals(overdueList[0].schedules.length(), 1);
+    test:assertEquals(overdueList[0].schedules[0].scheduleId, "SCH-PAST");
+    test:assertEquals(overdueList[0].schedules[0].dueDate, "2026-01-15");
 }
 
 @test:Config {}

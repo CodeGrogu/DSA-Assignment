@@ -22,13 +22,27 @@ jobs:
         with:
           version: 2201.13.5
 
+      - name: Install Ballerina gRPC Tool
+        run: bal tool pull grpc
+
       - name: Verify Code Formatting
         run: |
           echo "Verifying Ballerina code formatting across all packages..."
           for pkg in $(find . -maxdepth 2 -name "Ballerina.toml" -exec dirname {} \;); do
             echo "Checking format in: $pkg"
-            (cd "$pkg" && bal format --dry-run)
+            (cd "$pkg" && bal format)
+            git diff --exit-code "$pkg" || { echo "Formatting check failed in $pkg. Run 'bal format' locally."; exit 1; }
           done
+
+      - name: Verify Protobuf Contract Compilation
+        run: |
+          if [ -d "q2_rental_service/proto" ]; then
+            echo "Verifying Q2 Protobuf contract compiles cleanly with bal grpc..."
+            cd q2_rental_service
+            mkdir -p target/grpc_verify
+            bal grpc --input proto/rental_service.proto --output target/grpc_verify --mode service
+            cd ..
+          fi
 
       - name: Run Automated Tests with Coverage
         run: |
@@ -45,3 +59,14 @@ jobs:
             echo "Building package in: $pkg"
             (cd "$pkg" && bal build)
           done
+
+      - name: Upload Test and Coverage Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ballerina-test-reports
+          path: |
+            q1_library_service/target/report/
+            q2_rental_service/target/report/
+          if-no-files-found: ignore
+          retention-days: 7

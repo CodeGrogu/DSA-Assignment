@@ -31,8 +31,10 @@ description: |-
   1. **Status Code Check**: Asserts HTTP status code is `200 OK`.
   2. **Service Liveness**: Validates that `status` equals `"UP"`.
   3. **Content-Type**: Validates that the response header is `application/json`.
+order: 1000
 scripts:
   - type: afterResponse
+    language: text/javascript
     code: |-
       pm.test("Status code is 200", function () {
           pm.expect(pm.response.code).to.equal(200);

@@ -1,0 +1,45 @@
+$kind: http-request
+name: 17. Update Task Completion Status
+method: PATCH
+url: "{{base_url}}:{{port}}/assets/{{assetTag}}/work-orders/{{orderId}}/tasks/{{taskId}}"
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: Accept
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "completed": true
+    }
+description: |-
+  ### Endpoint Overview
+  Updates the completion boolean flag for an individual sub-task within a work order.
+
+  ---
+  ### HTTP Specification
+  - **Method**: `PATCH`
+  - **URL**: `{{base_url}}:{{port}}/assets/{{assetTag}}/work-orders/{{orderId}}/tasks/{{taskId}}`
+  - **Headers**:
+    - `Content-Type`: `application/json`
+    - `Accept`: `application/json`
+
+  ---
+  ### Automated Test Assertions
+  1. **Status Code Check**: Asserts HTTP `200 OK`.
+  2. **Task Completion Validation**: Confirms that the target task's completed flag is now true.
+order: 17000
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Status code is 200", function () {
+          pm.expect(pm.response.code).to.equal(200);
+      });
+      pm.test("Task completed status updated to true", function () {
+          var jsonData = pm.response.json();
+          var task = jsonData.tasks.find(function(t) { return t.taskId === pm.environment.get("taskId"); });
+          pm.expect(task).to.not.be.undefined;
+          pm.expect(task.completed).to.be.true;
+      });
