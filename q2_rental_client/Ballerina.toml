@@ -1,0 +1,12 @@
+[package]
+org = "peerpressure"
+name = "q2_rental_client"
+version = "0.1.0"
+distribution = "2201.13.5"
+authors = ["Jaden Awaseb", "Peer Pressure Team"]
+keywords = ["dsa", "grpc", "rental-client", "ballerina", "distributed-systems"]
+repository = "https://github.com/CodeGrogu/DSA-Assignment"
+
+[build-options]
+observabilityIncluded = true
+

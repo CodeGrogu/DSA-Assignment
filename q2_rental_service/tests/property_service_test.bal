@@ -311,3 +311,167 @@ isolated function testBookingModelAndResponseCarriesGuestIdentifier() {
     test:assertEquals(confirmResp.booking.guestId, "GUEST-555");
 }
 
+@test:Config {
+    groups: ["store", "remove", "security", "authorization"]
+}
+isolated function testRemovePropertyUnauthorizedHostFails() returns error? {
+    PropertyStore store = new ();
+
+    Property p = store.addProperty({
+        name: "Sunset Beach Villa",
+        location: "Swakopmund",
+        propertyType: "Villa",
+        pricePerNight: 2000.0,
+        hostId: "HOST-001"
+    });
+
+    // Attempt removal by an unauthorized host (HOST-999)
+    Property[]|error result = store.removeProperty(p.assetTag, "HOST-999", "Swakopmund");
+    test:assertTrue(result is error, "Attempting to remove property by non-owning host must fail");
+    if result is error {
+        test:assertTrue(result.message().includes("Unauthorized"), "Error message must indicate unauthorized access");
+    }
+
+    // Verify property was NOT removed from store
+    Property? stillThere = store.getProperty(p.assetTag);
+    test:assertTrue(stillThere is Property, "Property must remain intact after unauthorized removal attempt");
+}
+
+@test:Config {
+    groups: ["store", "remove", "validation"]
+}
+isolated function testRemovePropertyMismatchedLocationFails() returns error? {
+    PropertyStore store = new ();
+
+    Property p = store.addProperty({
+        name: "Mountain Vista Lodge",
+        location: "Windhoek",
+        propertyType: "Lodge",
+        pricePerNight: 1500.0,
+        hostId: "HOST-002"
+    });
+
+    // Attempt removal specifying wrong location
+    Property[]|error result = store.removeProperty(p.assetTag, "HOST-002", "Swakopmund");
+    test:assertTrue(result is error, "Attempting to remove property with mismatched location must fail");
+    if result is error {
+        test:assertTrue(result.message().includes("Location mismatch"), "Error message must indicate location mismatch");
+    }
+
+    // Verify property was NOT removed
+    Property? stillThere = store.getProperty(p.assetTag);
+    test:assertTrue(stillThere is Property, "Property must remain intact after location-mismatched removal attempt");
+}
+
+@test:Config {
+    groups: ["store", "update", "validation"]
+}
+isolated function testUpdatePropertyWithoutWhitespaceClobbering() returns error? {
+    PropertyStore store = new ();
+
+    Property p = store.addProperty({
+        name: "Original Name",
+        location: "Original Location",
+        propertyType: "Original Type",
+        pricePerNight: 1000.0,
+        hostId: "HOST-003"
+    });
+
+    // Update with whitespace strings
+    Property updated = check store.updateProperty({
+        assetTag: p.assetTag,
+        name: "   ",
+        location: "   ",
+        propertyType: "   "
+    });
+
+    // Verify original values are retained rather than replaced by whitespace
+    test:assertEquals(updated.name, "Original Name", "Whitespace update must not clobber existing name");
+    test:assertEquals(updated.location, "Original Location", "Whitespace update must not clobber existing location");
+    test:assertEquals(updated.propertyType, "Original Type", "Whitespace update must not clobber existing type");
+}
+
+@test:Config {
+    groups: ["store", "update", "validation"]
+}
+isolated function testUpdatePropertyValidatesStatus() returns error? {
+    PropertyStore store = new ();
+
+    Property p = store.addProperty({
+        name: "Desert Oasis",
+        location: "Sossusvlei",
+        propertyType: "Camp",
+        pricePerNight: 1200.0,
+        hostId: "HOST-004"
+    });
+
+    // Valid status updates
+    Property updatedMaintenance = check store.updateProperty({
+        assetTag: p.assetTag,
+        status: "MAINTENANCE"
+    });
+    test:assertEquals(updatedMaintenance.status, "MAINTENANCE");
+
+    Property updatedAvailable = check store.updateProperty({
+        assetTag: p.assetTag,
+        status: "available"
+    });
+    test:assertEquals(updatedAvailable.status, "AVAILABLE");
+
+    // Invalid status update
+    Property|error invalidResult = store.updateProperty({
+        assetTag: p.assetTag,
+        status: "HACKED_STATUS"
+    });
+    test:assertTrue(invalidResult is error, "Updating with invalid status string must return an error");
+}
+
+@test:Config {
+    groups: ["store", "update", "validation"]
+}
+isolated function testUpdatePropertyPriceValidation() returns error? {
+    PropertyStore store = new ();
+
+    Property p = store.addProperty({
+        name: "Safari Camp",
+        location: "Etosha",
+        propertyType: "Tent",
+        pricePerNight: 800.0,
+        hostId: "HOST-005"
+    });
+
+    // Negative price update
+    Property|error negResult = store.updateProperty({
+        assetTag: p.assetTag,
+        pricePerNight: -500.0
+    });
+    test:assertTrue(negResult is error, "Negative price update must return an error");
+
+    // Non-finite price update (NaN)
+    Property|error nanResult = store.updateProperty({
+        assetTag: p.assetTag,
+        pricePerNight: float:NaN
+    });
+    test:assertTrue(nanResult is error, "NaN price update must return an error");
+}
+
+@test:Config {
+    groups: ["store", "add", "sanitization"]
+}
+isolated function testAddPropertyTrimsInputs() returns error? {
+    PropertyStore store = new ();
+
+    Property p = store.addProperty({
+        name: "  Spacious Loft  ",
+        location: "  Windhoek  ",
+        propertyType: "  Loft  ",
+        pricePerNight: 950.0,
+        hostId: "  HOST-006  "
+    });
+
+    test:assertEquals(p.name, "Spacious Loft", "Name must be trimmed");
+    test:assertEquals(p.location, "Windhoek", "Location must be trimmed");
+    test:assertEquals(p.propertyType, "Loft", "Property type must be trimmed");
+    test:assertEquals(p.hostId, "HOST-006", "Host ID must be trimmed");
+}
+

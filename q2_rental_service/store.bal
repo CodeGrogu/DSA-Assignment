@@ -23,12 +23,12 @@ public isolated class PropertyStore {
 
             Property & readonly prop = {
                 assetTag: tag,
-                name: req.name,
-                location: req.location,
-                propertyType: req.propertyType,
+                name: req.name.trim(),
+                location: req.location.trim(),
+                propertyType: req.propertyType.trim(),
                 pricePerNight: req.pricePerNight,
                 status: "AVAILABLE",
-                hostId: req.hostId
+                hostId: req.hostId.trim()
             }.cloneReadOnly();
 
             self.properties[tag] = prop;
@@ -46,11 +46,11 @@ public isolated class PropertyStore {
         }
     }
 
-    # Updates an existing property listing. Only provided fields are updated,
-    # preserving untouched metadata without clobbering.
+    # Updates an existing property listing. Only provided non-empty fields are updated,
+    # preserving untouched metadata without clobbering. Validates status domains and price bounds.
     #
     # + req - The UpdatePropertyRequest containing updated field values
-    # + return - The updated Property record, or an error if the listing does not exist
+    # + return - The updated Property record, or an error if the listing does not exist or validation fails
     public isolated function updateProperty(UpdatePropertyRequest req) returns Property|error {
         lock {
             Property? current = self.properties[req.assetTag];
@@ -58,13 +58,32 @@ public isolated class PropertyStore {
                 return error(string `Property with assetTag '${req.assetTag}' not found`);
             }
 
+            // Validate price per night if supplied (proto3 defaults to 0.0 when unset)
+            float newPrice = current.pricePerNight;
+            if req.pricePerNight != 0.0 {
+                if !req.pricePerNight.isFinite() || req.pricePerNight < 0.0 {
+                    return error("Price per night must be a non-negative finite number.");
+                }
+                newPrice = req.pricePerNight;
+            }
+
+            // Validate domain status if supplied
+            string newStatus = current.status;
+            if req.status.trim().length() > 0 {
+                string statusUpper = req.status.trim().toUpperAscii();
+                if statusUpper != "AVAILABLE" && statusUpper != "RENTED" && statusUpper != "MAINTENANCE" {
+                    return error(string `Invalid status '${req.status}'. Allowed values are AVAILABLE, RENTED, or MAINTENANCE.`);
+                }
+                newStatus = statusUpper;
+            }
+
             Property & readonly updated = {
                 assetTag: current.assetTag,
-                name: req.name != "" ? req.name : current.name,
-                location: req.location != "" ? req.location : current.location,
-                propertyType: req.propertyType != "" ? req.propertyType : current.propertyType,
-                pricePerNight: req.pricePerNight > 0.0 ? req.pricePerNight : current.pricePerNight,
-                status: req.status != "" ? req.status : current.status,
+                name: req.name.trim().length() > 0 ? req.name.trim() : current.name,
+                location: req.location.trim().length() > 0 ? req.location.trim() : current.location,
+                propertyType: req.propertyType.trim().length() > 0 ? req.propertyType.trim() : current.propertyType,
+                pricePerNight: newPrice,
+                status: newStatus,
                 hostId: current.hostId
             }.cloneReadOnly();
 
@@ -75,6 +94,7 @@ public isolated class PropertyStore {
 
     # Removes a property listing by its assetTag and returns the host's remaining listings
     # in that region/location using a declarative query.
+    # Enforces host ownership and location verification before performing the deletion.
     #
     # + assetTag - The unique identifier of the property to remove
     # + hostId - The identifier of the Host owning the listing
@@ -82,9 +102,19 @@ public isolated class PropertyStore {
     # + return - Array of remaining Property records owned by the host in that location, or error
     public isolated function removeProperty(string assetTag, string hostId, string location) returns Property[]|error {
         lock {
-            if !self.properties.hasKey(assetTag) {
+            Property? existing = self.properties[assetTag];
+            if existing is () {
                 return error(string `Property with assetTag '${assetTag}' does not exist`);
             }
+            // Enforce caller authorization: only the owning host can remove their listing
+            if existing.hostId != hostId {
+                return error(string `Unauthorized: Property with assetTag '${assetTag}' does not belong to host '${hostId}'`);
+            }
+            // Enforce region consistency: verify the listing is in the requested location
+            if existing.location != location {
+                return error(string `Location mismatch: Property '${assetTag}' is located in '${existing.location}', not '${location}'`);
+            }
+
             _ = self.properties.remove(assetTag);
 
             Property[] remaining = from Property p in self.properties.toArray()

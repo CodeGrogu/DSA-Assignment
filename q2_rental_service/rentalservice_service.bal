@@ -1,8 +1,12 @@
 import ballerina/grpc;
 import ballerina/log;
 
+# Server port for the Rental Accommodation gRPC service endpoint.
+# Configurable via Config.toml or BAL_CONFIG_VAR_PORT per workspace standards.
+configurable int port = 9090;
+
 # gRPC Listener endpoint for the Rental Accommodation System.
-listener grpc:Listener ep = new (9090);
+listener grpc:Listener ep = new (port);
 
 # Server-side gRPC Service implementing the Rental Accommodation contract.
 @grpc:Descriptor {value: RENTAL_SERVICE_DESC}
@@ -18,11 +22,26 @@ isolated service "RentalService" on ep {
     isolated remote function add_property(AddPropertyRequest value) returns AddPropertyResponse|error {
         log:printInfo(string `Received add_property RPC request for '${value.name}' at '${value.location}'`);
 
+        // Validate that essential property fields are non-empty
         if value.name.trim().length() == 0 {
             return error grpc:InvalidArgumentError("Property name must not be empty.");
         }
-        if value.pricePerNight < 0.0 {
-            return error grpc:InvalidArgumentError("Price per night must be non-negative.");
+        if value.name.trim().length() > 120 {
+            return error grpc:InvalidArgumentError("Property name must not exceed 120 characters.");
+        }
+        if value.location.trim().length() == 0 {
+            return error grpc:InvalidArgumentError("Property location must not be empty.");
+        }
+        if value.propertyType.trim().length() == 0 {
+            return error grpc:InvalidArgumentError("Property type must not be empty.");
+        }
+        if value.hostId.trim().length() == 0 {
+            return error grpc:InvalidArgumentError("Host ID must not be empty.");
+        }
+
+        // Validate IEEE 754 finite floating point value and non-negativity
+        if !value.pricePerNight.isFinite() || value.pricePerNight < 0.0 {
+            return error grpc:InvalidArgumentError("Price per night must be a non-negative finite number.");
         }
 
         Property prop = self.store.addProperty(value);
