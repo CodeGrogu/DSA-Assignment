@@ -62,7 +62,7 @@ graph TD
 1. **Asset Tag Identifier Standard**: `assetTag` is enforced consistently across URL paths, JSON properties, and record fields.
 2. **Immutability across Lock Boundaries**: All objects entering or leaving `AssetStore` use `.cloneReadOnly()` to ensure complete data isolation across concurrently executing worker threads.
 3. **Status Code Semantics**: Proper HTTP semantics (`201` for creation, `200`/`204` for deletion/updates, `404` for missing entities, `400` for invalid payloads or duplicate keys).
-4. **Clean Code & Modularity**: Domain records reside in `modules/models`, storage logic in `modules/store`, client/CLI utilities in `modules/client`, and REST resources in the root package.
+4. **Clean Code & Modularity**: Domain records reside in `modules/models`, storage logic in `modules/store`, REST resources in `q1_library_service`, and client/CLI utilities in the dedicated `q1_library_client` package.
 
 ---
 
