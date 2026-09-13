@@ -25,8 +25,10 @@ This repository contains the implementation of Assignment 1 for DSA612S, structu
 
 ```text
 .
-├── q1_library_service/        # Question 1: REST Service, Models, Store, CLI Client
+├── q1_library_service/        # Question 1: REST Service, Models, Store
+├── q1_library_client/         # Question 1: REST CLI & Interactive Console Client
 ├── q2_rental_service/         # Question 2: gRPC Service, Proto Contract, In-Memory Store
+├── q2_rental_client/          # Question 2: gRPC Interactive CLI Client
 ├── postman/                   # Postman Collections and Environments (Local Mode v3 YAML)
 ├── docs/                      # Technical architecture and feature documentation
 ├── .agents/                   # Coding standards, workspace rules, and agent skills
@@ -38,33 +40,34 @@ This repository contains the implementation of Assignment 1 for DSA612S, structu
 
 ## 3. Quick Start
 
-### 3.1 Question 1: REST Service
+### 3.1 Question 1: REST Service & Client
 ```bash
+# Terminal 1: Start REST Service (port 9090)
 cd q1_library_service
-
-# Build package
 bal build
-
-# Run automated test suite
 bal test
-
-# Start the REST Service
 bal run
+
+# Terminal 2: Run CLI Client
+cd q1_library_client
+bal run                   # Interactive menu
+bal run -- health         # Direct health check
+bal run -- list           # List assets
 ```
 
-### 3.2 Question 2: gRPC Service
+### 3.2 Question 2: gRPC Service & Client
 ```bash
+# Terminal 1: Start gRPC Service (port 9090)
 cd q2_rental_service
-
-# Build package
 bal build
-
-# Run automated test suite
 bal test
+bal run
 
-# Start the gRPC Service (port 9090)
+# Terminal 2: Run gRPC Client
+cd q2_rental_client
 bal run
 ```
+
 
 To regenerate stubs from the Protobuf contract:
 ```bash

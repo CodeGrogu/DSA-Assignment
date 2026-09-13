@@ -21,11 +21,17 @@ q1_library_service/
 ├── service.bal                # HTTP REST service and resource definitions
 ├── types.bal                  # API response records and DTOs
 ├── modules/
-│   ├── client/                # CLI client & HTTP client library module
 │   ├── models/                # Canonical domain models and validation rules
 │   └── store/                 # Thread-safe in-memory asset storage engine
 └── tests/
     └── service_test.bal       # Integration tests against local test listener
+
+q1_library_client/             # Dedicated CLI & interactive terminal client package
+├── Ballerina.toml             # Client package metadata
+├── Config.example.toml        # Client configuration template
+├── client.bal                 # Dual-mode CLI commands and interactive console UI
+├── types.bal                  # Client-side domain records
+└── tests/                     # Automated client test suite
 ```
 
 ---

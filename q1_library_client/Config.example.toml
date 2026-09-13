@@ -1,0 +1,13 @@
+# ==============================================================================
+# Q1 Library & Resource Management System Client - Configuration Template
+# Copy this file to Config.toml for local execution:
+#   cp Config.example.toml Config.toml
+# ==============================================================================
+
+[peerpressure.q1_library_client]
+# Target REST server endpoint URL for Library & Resource Management Service
+serviceUrl = "http://localhost:9090"
+
+# HTTP request timeout in seconds (default: 10.0 seconds)
+# Prevents client threads from hanging indefinitely during network partitions or server hangs
+clientTimeout = 10.0

@@ -24,12 +24,9 @@ q1_library_service/
 │   ├── models/                # Canonical Ballerina record definitions and status types
 │   │   ├── models.bal         # Asset, Component, Schedule, WorkOrder, Task records
 │   │   └── tests/             # Record validation and serialization unit tests
-│   ├── store/                 # Thread-safe in-memory storage engine
-│   │   ├── store.bal          # Isolated AssetStore with primary key indexing & sub-resources
-│   │   └── tests/             # CRUD concurrency, sub-resources, and filter tests
-│   └── client/                # CLI client & HTTP Client library module
-│       ├── client.bal         # Reusable LibraryClient class & interactive CLI command handler
-│       └── tests/             # Client initialisation and integration tests
+│   └── store/                 # Thread-safe in-memory storage engine
+│       ├── store.bal          # Isolated AssetStore with primary key indexing & sub-resources
+│       └── tests/             # CRUD concurrency, sub-resources, and filter tests
 └── tests/
     └── service_test.bal       # HTTP integration tests against live endpoints
 ```
@@ -76,10 +73,18 @@ bal run
 ```
 
 ### Run the CLI Client
+The interactive and command-line client is maintained in the dedicated package `q1_library_client`:
 ```bash
-bal run -- "http://localhost:9090" list
-bal run -- "http://localhost:9090" get TAG-TEST-001
-bal run -- "http://localhost:9090" overdue
+cd ../q1_library_client
+
+# Interactive menu
+bal run
+
+# Direct CLI commands
+bal run -- health
+bal run -- list
+bal run -- get TAG-TEST-001
+bal run -- overdue
 ```
 
 ---
@@ -110,4 +115,4 @@ bal run -- "http://localhost:9090" overdue
 
 * **Identifier Convention**: All asset identifiers use camelCase `assetTag`.
 * **Thread Safety**: Storage modifications are guarded via `isolated` class locks and `.cloneReadOnly()`.
-* **Testing Gate**: 100% test pass rate across `models`, `store`, `client`, and `service` modules.
+* **Testing Gate**: 100% test pass rate across `models`, `store`, and `service` modules.

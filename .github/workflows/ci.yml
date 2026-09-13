@@ -67,6 +67,8 @@ jobs:
           name: ballerina-test-reports
           path: |
             q1_library_service/target/report/
+            q1_library_client/target/report/
             q2_rental_service/target/report/
+            q2_rental_client/target/report/
           if-no-files-found: ignore
           retention-days: 7

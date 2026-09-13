@@ -74,6 +74,13 @@ bal run
 ```
 The gRPC listener will start on port `9090`.
 
+### Run the gRPC Client
+The interactive client is located in the dedicated package `q2_rental_client`:
+```bash
+cd ../q2_rental_client
+bal run
+```
+
 ---
 
 ## 6. Concurrency & Quality Gates
