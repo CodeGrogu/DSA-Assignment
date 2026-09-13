@@ -1,8 +1,1 @@
-{
-  "loaning": "/api/loaning",
-  "booking": "/api/booking",
-  "global": "/assets",
-  "campus": "/api/campus",
-  "overdue": "/api/overdue",
-  "schedule": "/api/schedule"
-}
+{"moved":"q1_library_service/modules/client/endpoints.json","note":"Do not keep this file at the package root; see modules/client/endpoints.json for the active mapping."}

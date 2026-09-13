@@ -1,0 +1,8 @@
+{
+  "loaning": "/api/loaning",
+  "booking": "/api/booking",
+  "global": "/assets",
+  "campus": "/api/campus",
+  "overdue": "/api/overdue",
+  "schedule": "/api/schedule"
+}
