@@ -18,6 +18,7 @@ public function main() returns error? {
     RentalServiceClient rentalClient = check new (serviceUrl, timeout = rpcTimeout);
 
     boolean running = true;
+    int emptyInputCount = 0;
     while running {
         io:println("\n=== Rental Service Client ===");
         io:println("1. Add Property");
@@ -32,9 +33,15 @@ public function main() returns error? {
 
         // Guard against infinite busy-looping when stdin reaches EOF or piped input runs out
         if choice.trim().length() == 0 {
-            io:println("Empty input or EOF detected. Exiting Rental Service Client.");
-            break;
+            emptyInputCount += 1;
+            if emptyInputCount >= 3 {
+                io:println("Multiple empty inputs or EOF detected. Exiting Rental Service Client.");
+                break;
+            }
+            io:println("No option entered. Please select a valid menu option (0-7).");
+            continue;
         }
+        emptyInputCount = 0;
 
         match choice.trim() {
             "1" => {
@@ -388,6 +395,11 @@ function handleCreateUsers(RentalServiceClient rentalClient) {
         grpc:Error? completeErr = streamingClient->complete();
         if completeErr is grpc:Error {
             io:println("Error completing stream: ", completeErr.message());
+        }
+        // Drain and discard any pending server response to ensure clean stream termination
+        CreateUsersResponse|grpc:Error? drainResp = streamingClient->receiveCreateUsersResponse();
+        if drainResp is grpc:Error {
+            io:println("Notice: stream closed: ", drainResp.message());
         }
         return;
     }

@@ -1,0 +1,10 @@
+# ==============================================================================
+# Q2 Vacation Property Rental Service - Configuration Template
+# Copy this file to Config.toml for local execution:
+#   cp Config.example.toml Config.toml
+# ==============================================================================
+
+[peerpressure.q2_rental_service]
+# Server listener port for the Rental Accommodation gRPC service endpoint
+# Overridable via BAL_CONFIG_VAR_PORT or Config.toml
+port = 9090
