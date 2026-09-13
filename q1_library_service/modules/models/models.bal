@@ -44,6 +44,11 @@ public type Asset record {|
     WorkOrder[] workOrders = [];
 |};
 
+public type Institution record {|
+    readonly string id;
+    string name;
+|};
+
 public isolated function isValidAssetStatus(string statusStr) returns boolean {
     return statusStr == "AVAILABLE" ||
         statusStr == "LOANED_OUT" ||

@@ -350,3 +350,35 @@ public isolated function updateWorkOrder(string assetTag, models:WorkOrder workO
 public isolated function resetStore() {
     storeInstance.resetStore();
 }
+
+// ==========================================================================
+// INSTITUTION DATA STORE
+// ==========================================================================
+
+isolated table<models:Institution> key(id) institutionTable = table [];
+
+public isolated function getAllInstitutions() returns models:Institution[] {
+    lock {
+        return institutionTable.toArray().cloneReadOnly();
+    }
+}
+
+public isolated function addInstitution(models:Institution inst) returns error? {
+    models:Institution & readonly instVal = inst.cloneReadOnly();
+    lock {
+        if institutionTable.hasKey(instVal.id) {
+            return error(string `Institution with ID '${instVal.id}' already exists.`);
+        }
+        institutionTable.put(instVal);
+    }
+}
+
+public isolated function deleteInstitution(string id) returns boolean {
+    lock {
+        if institutionTable.hasKey(id) {
+            _ = institutionTable.remove(id);
+            return true;
+        }
+        return false;
+    }
+}
