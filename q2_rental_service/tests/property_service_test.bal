@@ -1,3 +1,4 @@
+import ballerina/grpc;
 import ballerina/test;
 
 @test:Config {
@@ -246,6 +247,34 @@ isolated function testUserModelCreationAndRoleDistinction() {
     test:assertEquals(guestUser.role, "GUEST", "User model must distinguish Guest role");
     test:assertEquals(hostUser.userId, "USR-001");
     test:assertEquals(guestUser.userId, "USR-002");
+}
+
+@test:Config {
+    groups: ["streaming", "issue41"]
+}
+isolated function testCreateUsersStreamsMoreThanThreeUsers() returns error? {
+    RentalServiceClient rentalClient = check new ("http://localhost:9090");
+    Create_usersStreamingClient userStream = check rentalClient->create_users();
+    int expectedCount = 5;
+
+    foreach int index in 1 ... expectedCount {
+        User user = {
+            userId: string `USR-${index}`,
+            name: string `Test User ${index}`,
+            role: index == 1 ? "HOST" : "GUEST",
+            email: string `user${index}@example.com`,
+            phoneNumber: string `+2648100000${index}`
+        };
+        check userStream->sendUser(user);
+    }
+
+    check userStream->complete();
+    CreateUsersResponse|grpc:Error? response = check userStream->receiveCreateUsersResponse();
+    test:assertTrue(response is CreateUsersResponse, "The stream should return one final response");
+    if response is CreateUsersResponse {
+        test:assertEquals(response.count, expectedCount);
+        test:assertTrue(response.success);
+    }
 }
 
 @test:Config {

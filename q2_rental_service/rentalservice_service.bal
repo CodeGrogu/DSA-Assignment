@@ -175,8 +175,10 @@ isolated service "RentalService" on ep {
         int count = 0;
         record {|User value;|}|grpc:Error? item = clientStream.next();
         while item is record {|User value;|} {
+            User user = item.value;
+            _ = self.store.addUser(user);
             count += 1;
-            log:printInfo(string `Registered user [${item.value.role}] '${item.value.name}' (${item.value.userId})`);
+            log:printInfo(string `Registered user [${user.role}] '${user.name}' (${user.userId})`);
             item = clientStream.next();
         }
         if item is grpc:Error {

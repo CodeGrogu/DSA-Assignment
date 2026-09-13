@@ -7,6 +7,8 @@
 public isolated class PropertyStore {
     // In-memory map keyed by unique assetTag
     private map<Property & readonly> properties = {};
+    // In-memory map keyed by unique userId for streamed user registration
+    private map<User & readonly> users = {};
     // Monotonically increasing counter for unique assetTag generation
     private int counter = 1001;
 
@@ -116,6 +118,44 @@ public isolated class PropertyStore {
                     && (filter.maxPrice <= 0.0 || p.pricePerNight <= filter.maxPrice)
                 select p;
             return matched.cloneReadOnly();
+        }
+    }
+
+    # Registers a new user profile in the in-memory store.
+    #
+    # + user - The incoming User payload
+    # + return - The stored User record
+    public isolated function addUser(User user) returns User {
+        lock {
+            User & readonly savedUser = {
+                userId: user.userId,
+                name: user.name,
+                role: user.role,
+                email: user.email,
+                phoneNumber: user.phoneNumber
+            }.cloneReadOnly();
+
+            self.users[user.userId] = savedUser;
+            return savedUser;
+        }
+    }
+
+    # Retrieves a single user by their unique userId.
+    #
+    # + userId - The unique identifier of the user
+    # + return - The User record if found, or nil `()` if not found
+    public isolated function getUser(string userId) returns User? {
+        lock {
+            return self.users[userId];
+        }
+    }
+
+    # Returns all users currently in the store.
+    #
+    # + return - Array of all User records
+    public isolated function getAllUsers() returns User[] {
+        lock {
+            return self.users.toArray().cloneReadOnly();
         }
     }
 
