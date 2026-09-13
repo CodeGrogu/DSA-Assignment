@@ -372,6 +372,8 @@ service / on httpListener {
             message: string `Institution '${id}' removed successfully.`,
             id: id
         };
+    }
+
     # Adds a sub-task to an existing work order.
     # + assetTag - Unique asset tag
     # + orderId - Unique work order identifier
