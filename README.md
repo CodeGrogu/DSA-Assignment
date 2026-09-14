@@ -1,53 +1,54 @@
 # Distributed Systems & Applications (DSA612S) Assignment 1
 
-**Team:** Peer Pressure (`PEE`)
-**Lead:** Jaden Awaseb
-**Runtime:** Ballerina Swan Lake 2201.13.5
+**Team:** Peer Pressure (`PEE`)  
+**Lead:** Jaden Awaseb  
+**Runtime:** Ballerina Swan Lake 2201.13.5  
+**Target Repository:** [CodeGrogu/DSA-Assignment](https://github.com/CodeGrogu/DSA-Assignment)
 
 ---
 
 ## 1. Project Overview
 
-This repository contains the implementation of Assignment 1 for DSA612S, structured into two distributed systems:
+This repository contains the complete implementation of Assignment 1 for Distributed Systems & Applications (DSA612S), architected into two distinct distributed microservices:
 
 1. **Question 1: Library & Resource Management System (REST)**
+   - Located in [`q1_library_service/`](file:///c:/Users/Jaden/Documents/Programming/University/DSA/DSA-Assignment/q1_library_service) and [`q1_library_client/`](file:///c:/Users/Jaden/Documents/Programming/University/DSA/DSA-Assignment/q1_library_client)
+   - **Architecture:** RESTful HTTP microservice + Interactive and scriptable CLI client
+   - **Data Layer:** In-memory `AssetStore` and `InstitutionStore` using Ballerina Swan Lake `table` data structures guarded by synchronized mutex locks to prevent TOCTOU race conditions
+   - **Identifiers:** Canonical `assetTag` in camelCase across all records, payloads, and endpoints
 
-   * Located in `q1_library_service/` and `q1_library_client/`
-   * Architecture: RESTful HTTP API + CLI Client
-   * Data Layer: In-memory asset store with isolated lock concurrency
-
-2. **Question 2: Rental Accommodation System (gRPC)**
-
-   * Located in `q2_rental_service/` and `q2_rental_client/`
-   * Architecture: Protocol Buffers v3 + Ballerina gRPC Service and Client
-   * Streaming: Unary, client-streaming (`create_users`), and server-streaming (`list_available_properties`)
+2. **Question 2: Vacation Property Rental Accommodation System (gRPC)**
+   - Located in [`q2_rental_service/`](file:///c:/Users/Jaden/Documents/Programming/University/DSA/DSA-Assignment/q2_rental_service) and [`q2_rental_client/`](file:///c:/Users/Jaden/Documents/Programming/University/DSA/DSA-Assignment/q2_rental_client)
+   - **Architecture:** Protocol Buffers v3 contract + High-performance Ballerina gRPC Service and Client
+   - **Communication Paradigms:** Unary RPCs, client-streaming (`create_users`), and server-streaming (`list_available_properties`)
+   - **Booking Safety:** Two-phase reservation architecture (`book_property` + `confirm_booking`) ensuring thread-safe date conflict resolution and preventing double-booking
 
 ---
 
 ## 2. Prerequisites
 
-Before running the project, make sure the following are installed:
+Before running the project, ensure the following tools are installed:
 
-* **Ballerina Swan Lake 2201.13.5**
-* **Git**
-* **Visual Studio Code** or another suitable code editor
-* A terminal such as PowerShell, Command Prompt, or Bash
+- **Ballerina Swan Lake 2201.13.5** (Official Swan Lake release)
+- **Git**
+- A terminal shell such as PowerShell, Bash, or Command Prompt
 
-Verify Ballerina is installed:
+Verify your local Ballerina installation:
 
 ```bash
 bal version
 ```
 
-The displayed version should be compatible with the project runtime:
-
+Expected output:
 ```text
-2201.13.5
+Ballerina 2201.13.5 (Swan Lake Update 13)
+Language specification 2024R1
+Update Tool 1.5.0
 ```
 
 ---
 
-## 3. Clone and Set Up the Repository
+## 3. Clone and Repository Structure
 
 Clone the repository from GitHub:
 
@@ -56,30 +57,28 @@ git clone https://github.com/CodeGrogu/DSA-Assignment.git
 cd DSA-Assignment
 ```
 
-The repository contains the following main directories:
+### Directory Layout
 
 ```text
 .
-├── q1_library_service/        # Question 1: REST Service, Models, Store
-├── q1_library_client/         # Question 1: REST CLI & Interactive Client
-├── q2_rental_service/         # Question 2: gRPC Service, Proto Contract, Store
-├── q2_rental_client/          # Question 2: gRPC Interactive CLI Client
-├── postman/                   # Postman Collections and Environments
-├── docs/                      # Technical documentation
-├── .agents/                   # Workspace rules and agent skills
-├── AGENTS.md                  # Developer and agent workflow guidelines
-└── README.md                  # Project documentation
+├── q1_library_service/        # Question 1: REST Service, Models, and In-Memory Store
+├── q1_library_client/         # Question 1: REST CLI and Interactive Terminal Client
+├── q2_rental_service/         # Question 2: gRPC Service, Proto Contract, and Store
+├── q2_rental_client/          # Question 2: gRPC Interactive Terminal Client
+├── postman/                   # Postman v3 YAML Collections and Local Environments
+├── docs/                      # Technical architecture and contributor verification reports
+├── .agents/                   # Workspace rules and development skills
+├── AGENTS.md                  # Developer guidelines and quality gate standards
+└── README.md                  # Master project documentation
 ```
 
 ---
 
-## 4. Quick Start
+## 4. Quick Start: Question 1 (REST Service & Client)
 
-### 4.1 Question 1: REST Service & Client
+The REST service must be started before launching the client.
 
-The REST service must be running before starting the client.
-
-### Terminal 1 — Start the REST Service
+### Terminal 1: Start the REST Service
 
 ```bash
 cd q1_library_service
@@ -88,17 +87,14 @@ bal test
 bal run
 ```
 
-`bal test` runs the automated tests. It does not keep the service running after the tests finish. Use `bal run` to start the service.
-
-The REST service runs on:
-
+The service will start listening on:
 ```text
 http://localhost:9090
 ```
 
-### Terminal 2 — Run the CLI Client
+### Terminal 2: Run the CLI Client
 
-Open a second terminal:
+Open a second terminal window:
 
 ```bash
 cd q1_library_client
@@ -106,37 +102,77 @@ bal build
 bal run
 ```
 
-The client provides an interactive menu for:
+### Interactive Menu Mode (Options 1 to 16)
 
-1. Check Service Health
-2. List All Assets
-3. Get Asset by `assetTag`
-4. Register New Asset
-5. Update Asset Status / Metadata
-6. Delete Asset
-7. View Asset Status & Work Orders
-8. View Overdue Maintenance Assets
-9. Attach Component to Asset
-10. Attach Schedule to Asset
-
-The client also supports direct commands:
-
-```bash
-bal run -- health
-bal run -- list
-```
-
-Example health response:
+When executed without arguments (`bal run`), the client provides an interactive terminal interface:
 
 ```text
-Service Health: {"status":"UP", ...}
+======================================================
+  Library & Resource Management System - CLI Client   
+======================================================
+1.  Check Service Health
+2.  List All Assets
+3.  Get Asset by Asset Tag
+4.  Register New Asset
+5.  Update Asset Status / Metadata
+6.  Delete Asset
+7.  View Asset Status & Work Orders
+8.  View Overdue Maintenance Assets
+9.  Attach Component to Asset
+10. Attach Schedule to Asset
+11. View All Work Orders for Asset
+12. Create Work Order for Asset
+13. Add Task to Work Order
+14. Mark Task Completed
+15. Close Work Order
+16. Manage Institutions
+0.  Exit
+```
+
+### Direct Command-Line Arguments Mode
+
+The client also supports direct command execution for scripting and quick checks:
+
+```bash
+# Verify service health
+bal run -- health
+
+# List all registered assets
+bal run -- list
+
+# Filter assets by institution and site
+bal run -- list NUST "Main Campus"
+
+# Inspect a specific asset by assetTag
+bal run -- get AST-1001
+
+# Inspect operational status and work orders
+bal run -- status AST-1001
+
+# Check for overdue maintenance
+bal run -- overdue
+
+# Query work orders for an asset
+bal run -- work-orders AST-1001
+
+# Query tasks on a work order
+bal run -- tasks AST-1001 WO-501
+
+# Close a completed work order
+bal run -- close-wo AST-1001 WO-501
+
+# Delete an asset by tag
+bal run -- delete AST-1001
+
+# Display usage instructions
+bal run -- help
 ```
 
 ---
 
-### 4.2 Question 2: gRPC Service & Client
+## 5. Quick Start: Question 2 (gRPC Service & Client)
 
-### Terminal 1 — Start the gRPC Service
+### Terminal 1: Start the gRPC Service
 
 ```bash
 cd q2_rental_service
@@ -145,7 +181,11 @@ bal test
 bal run
 ```
 
-### Terminal 2 — Run the gRPC Client
+The gRPC server listener will initialise and listen on port `9090`.
+
+### Terminal 2: Run the gRPC Client
+
+Open a second terminal window:
 
 ```bash
 cd q2_rental_client
@@ -153,93 +193,133 @@ bal build
 bal run
 ```
 
-To regenerate gRPC stubs from the Protocol Buffers contract:
+The client will display the interactive menu allowing you to exercise all 8 operations:
 
-```bash
-bal grpc --input proto/rental_service.proto --output . --mode service
+```text
+======================================================
+     Rental Accommodation System - gRPC Client        
+======================================================
+1.  Add Property (Host)
+2.  Update Property (Host)
+3.  Remove Property (Host)
+4.  Search Property
+5.  List Available Properties (Server Streaming)
+6.  Register Users (Client Streaming)
+7.  Book Property (Two-Phase Guest Reservation)
+0.  Exit
 ```
+
+### Protocol Buffers Compilation (`bal grpc`)
+
+The service schema is defined in `q2_rental_service/proto/rental_service.proto`. To compile or regenerate Ballerina code stubs:
+
+1. **Pull the Ballerina gRPC tool** (first-time setup):
+   ```bash
+   bal tool pull grpc
+   ```
+
+2. **Generate Service Stubs** (in `q2_rental_service`):
+   ```bash
+   cd q2_rental_service
+   bal grpc --input proto/rental_service.proto --output . --mode service
+   ```
+
+3. **Generate Client Stubs** (in `q2_rental_client`):
+   ```bash
+   cd q2_rental_client
+   bal grpc --input ../q2_rental_service/proto/rental_service.proto --output . --mode client
+   ```
+
+### Exercising the 8 gRPC Operations
+
+| # | RPC Method | Interaction Type | How to Test via Interactive Client |
+| :- | :--- | :--- | :--- |
+| 1 | `add_property` | Unary | Select option `1`. Provide property title, location, type, and nightly price. Server returns a unique `assetTag` (e.g. `PROP-1001`). |
+| 2 | `update_property` | Unary | Select option `2`. Provide existing `assetTag` and updated fields. Omitted fields retain stored values. |
+| 3 | `remove_property` | Unary | Select option `3`. Enter `assetTag`, host ID, and location. Verifies ownership and returns host's remaining regional listings. |
+| 4 | `search_property` | Unary | Select option `4`. Enter `assetTag`. Returns listing details or "Not Available". |
+| 5 | `create_users` | Client Streaming | Select option `6`. Stream multiple user accounts (Hosts and Guests) over a single connection. Closing the stream returns a total registration count. |
+| 6 | `list_available_properties` | Server Streaming | Select option `5`. Specify optional filters (location, type, price bounds). Server streams matching listings in real time. |
+| 7 | `book_property` | Unary (Phase 1) | Select option `7`. Enter `assetTag`, guest ID, check-in, and check-out. Checks availability, validates dates, and stages booking in cart. |
+| 8 | `confirm_booking` | Unary (Phase 2) | Enter `y` when prompted by option `7`. Serialises finalisation inside mutex lock, calculates total cost, and confirms booking. |
 
 ---
 
-## 5. Testing
+## 6. Automated Testing & Verification
 
-Automated tests can be run from each service directory:
+Both services provide automated test suites configured with isolated test ports to prevent collisions with running servers:
 
+### Run Question 1 Tests
 ```bash
+cd q1_library_service
 bal test
 ```
+*Port configuration:* Isolated on port `9095` via `tests/Config.toml`.  
+*Coverage:* 27 passing tests across models, in-memory store concurrency, and REST endpoints.
 
-Build verification can be performed with:
-
+### Run Question 2 Tests
 ```bash
-bal build
+cd q2_rental_service
+bal test
+```
+*Port configuration:* Isolated on port `9096` via `tests/Config.toml`.  
+*Coverage:* 24 passing tests covering all 8 RPCs, client streaming, server streaming, and two-phase booking conflict resolution.
+
+### Code Formatting Verification
+```bash
+bal format --dry-run
+```
+All packages strictly adhere to Ballerina official formatting rules with 0 diffs.
+
+---
+
+## 7. Postman API Testing (Local Mode v3 YAML)
+
+The repository includes a version-controlled Postman test suite under `postman/`:
+- **Collection:** [`postman/collections/q1-library-management/`](file:///c:/Users/Jaden/Documents/Programming/University/DSA/DSA-Assignment/postman/collections/q1-library-management) containing 19 individual request files in v3 YAML format.
+- **Environment:** [`postman/environments/peerpressure-local.environment.yaml`](file:///c:/Users/Jaden/Documents/Programming/University/DSA/DSA-Assignment/postman/environments/peerpressure-local.environment.yaml) preconfigured for `http://localhost:9090`.
+
+---
+
+## 8. Contributor Verification & Ownership Matrix
+
+In compliance with the assignment specification, repository commit history was audited using `git shortlog -sne --all` to confirm genuine collaboration and work distribution across all eight team members:
+
+```text
+    13  Jaden <acehood3556@gmail.com>
+     7  Henchoz <henryheita0@gmail.com>
+     6  Jaden <73761054+CodeGrogu@users.noreply.github.com>
+     5  Kataliina <kataliinamassipa@gmail.com>
+     4  Nangu.Tjizoo <knangukuii@gmail.com>
+     3  Jerganov <klvntapiwa3@gmail.com>
+     2  Florriinnddaa <florinda.funya@gmail.com>
+     2  Kondwani112206 <kondwanikunkwenzu@gmail.com>
+     2  Liina Massipa <162906488+LiinaMassipa@users.noreply.github.com>
+     1  May-Lee Mulundu <117192151+itsyagirlmay@users.noreply.github.com>
+     1  kondwani11220 <kondwanikunkwenzu@gmail.com>
 ```
 
-Code formatting can be checked/applied with:
+### Team Ownership Table
 
-```bash
-bal format
-```
+| # | Student Name | Git Author Identifiers | Primary Module Contributions |
+| :- | :--- | :--- | :--- |
+| 1 | **Jaden Awaseb** (Lead) | `Jaden <acehood3556@gmail.com>`<br>`Jaden <73761054+CodeGrogu...>` | Overall architecture, Q1 REST service, concurrency store mutex locks, Q2 gRPC client implementation (PEE-51), quality gate automation. |
+| 2 | **Henry Heita** | `Henchoz <henryheita0@gmail.com>` | Q1 REST endpoints, query filtering by institution and site, asset modification handlers, and endpoint unit tests. |
+| 3 | **Kataliina (Liina) Massipa** | `Kataliina <kataliinamassipa@gmail.com>`<br>`Liina Massipa <162906488+LiinaMassipa...>` | Q1 canonical asset records, data validation, CRUD test suite design, and endpoint validation testing (PEE-11). |
+| 4 | **Nangu Tjizoo** | `Nangu.Tjizoo <knangukuii@gmail.com>` | Q2 gRPC streaming RPCs: client-streaming user registration (`create_users`), server-streaming property browsing (`list_available_properties`), and stream unit tests. |
+| 5 | **Tapiwa Kelvin Jerganov** | `Jerganov <klvntapiwa3@gmail.com>` | Postman Local Mode v3 YAML test suites, shared environment templates (`peerpressure-local`), and API contract testing (PEE-8). |
+| 6 | **Kondwani Kunkwenzu** | `Kondwani112206 <kondwanikunkwenzu@gmail.com>`<br>`kondwani11220 <kondwanikunkwenzu...>` | Q1 schedule management, overdue item detection, asset status checking, and Q2 property store CRUD operations. |
+| 7 | **Florinda Funya** | `Florriinnddaa <florinda.funya@gmail.com>` | Repository onboarding documentation, setup and execution guides, client terminal workflow walkthroughs, and contributor verification documentation. |
+| 8 | **May-Lee Mulundu** | `May-Lee Mulundu <117192151+itsyagirlmay...>` | Q2 booking business logic: two-phase reservation flow (`book_property` + `confirm_booking`), temporary cart management, and date overlap calculations. |
 
-For Question 1, the REST service and CLI were tested through an end-to-end session covering the available client operations, including:
-
-* Service health check
-* Asset listing
-* Asset retrieval
-* Asset registration
-* Asset update
-* Asset status and work-order view
-* Overdue maintenance view
-* Component attachment
-* Schedule attachment
-* Asset deletion
+For detailed audit logs and module breakdowns, refer to [`docs/contributor-verification-report.md`](file:///c:/Users/Jaden/Documents/Programming/University/DSA/DSA-Assignment/docs/contributor-verification-report.md).
 
 ---
 
-## 6. Technical Documentation
+## 9. Academic Integrity and Group Work Declaration
 
-* [PEE-37: Q2 Proto Contract & Property Management](docs/pee-37-q2-proto-contract-and-property-management.md)
-* [PEE-10: Thread-Safe In-Memory Asset Store](docs/pee-10-thread-safe-in-memory-store.md)
-* [PEE-9: Canonical Asset Data Models](docs/pee-9-canonical-asset-data-models.md)
-* [PEE-8: Project Skeleton & Postman Test Suite](docs/pee-8-project-skeleton-and-postman-suite.md)
-* [PEE-7: Library & Resource Management Overview](docs/pee-7-library-and-resource-management-system.md)
-* [Postman Team Collaboration Guide](docs/postman-team-collaboration-guide.md)
+This project represents genuine, collaborative group work authored by the eight members of the Peer Pressure team. In full accordance with the academic integrity policy of the Namibia University of Science and Technology (NUST) and the DSA612S course brief:
 
----
-
-## 7. Development Workflow & Contribution Rules
-
-* **Branching Model:** Work is tracked in Linear under the `PEE` team using dedicated branches such as `feat/<issue-id>-<description>`.
-* **Quality Gates:** Pull requests should pass `bal test`, `bal format`, and `bal build` before merging.
-* **Naming Standards:** Primary entity keys across the project use `assetTag` in camelCase.
-
----
-
-## 8. Contributor Verification
-
-The Git repository history was reviewed using:
-
-```bash
-git shortlog -sne --all
-```
-
-The Git history was checked to confirm that the project contains contributions from the team's members. Some members appear under more than one Git identity because different email addresses were used for commits.
-
-
-The project reflects genuine collaborative work by the team, with members responsible for understanding and contributing to the submitted implementation.
-
---- 
-
-## 9. Academic Integrity
-
-This project represents genuine collaborative work by the Peer Pressure team. Each team member is responsible for understanding the work they contributed and being able to explain the submitted implementation.
-
-Where development tools or AI-assisted tools were used for support, the resulting work was reviewed, tested, and understood by the team. The submitted solution is not presented as entirely AI-generated work.
-
----
-
-## 10. Team
-
-**Peer Pressure (PEE)**
-
-The repository history provides the record of individual contributions made by team members throughout development.
+- **Original Authorship:** All software architectures, service implementations, in-memory data structures, client applications, and test harnesses were designed and produced collaboratively by the team.
+- **Individual Understanding:** Each team member understands the implementation of their assigned modules and is prepared to discuss and defend their contributions during assessments.
+- **Responsible Tool Use:** Development tools, linters, and AI coding assistants were utilised solely for code quality verification and iterative assistance. All logic was reviewed, tested, and validated by human team members. The submission is not an unverified or 100% automated AI generation.
