@@ -1,20 +1,56 @@
 name: PeerPressure Dev
 values:
   - key: base_url
-    value: 'http://localhost'
+    value: http://localhost
+    enabled: true
   - key: port
-    value: '9090'
+    value: "9090"
+    enabled: true
   - key: assetTag
     value: TAG-TEST-001
+    enabled: true
   - key: compId
     value: COMP-01
+    enabled: true
   - key: scheduleId
     value: SCH-01
+    enabled: true
   - key: orderId
     value: WO-101
+    enabled: true
   - key: taskId
     value: TSK-02
+    enabled: true
+  - key: instCode
+    value: NUST
+    enabled: true
   - key: grpc_host
     value: localhost
+    enabled: true
   - key: grpc_port
-    value: '9090'
+    value: "9090"
+    enabled: true
+  - key: propertyTag
+    value: PROP-1001
+    enabled: true
+  - key: hostId
+    value: HOST-001
+    enabled: true
+  - key: guestId
+    value: GUEST-001
+    enabled: true
+  - key: bookingId
+    value: BOOK-1
+    enabled: true
+  - key: userId
+    value: USR-101
+    enabled: true
+  - key: location
+    value: Swakopmund
+    enabled: true
+  - key: propertyType
+    value: Apartment
+    enabled: true
+  - key: pricePerNight
+    value: "1200.0"
+    enabled: true

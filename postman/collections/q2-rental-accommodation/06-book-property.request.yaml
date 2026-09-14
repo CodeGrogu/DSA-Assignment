@@ -1,0 +1,56 @@
+$kind: http-request
+name: 06. Book Property (Phase 1 Reservation)
+method: POST
+url: "{{grpc_host}}:{{grpc_port}}/rental.RentalService/book_property"
+headers:
+  - key: Content-Type
+    value: application/grpc+proto
+body:
+  type: json
+  content: |-
+    {
+      "assetTag": "{{propertyTag}}",
+      "guestId": "GUEST-001",
+      "checkInDate": "2026-11-01",
+      "checkOutDate": "2026-11-05"
+    }
+description: |-
+  ### Endpoint Overview
+  Unary gRPC RPC executing Phase 1 of the two-phase booking architecture. Verifies property availability, validates that check-in date is in the future, checks date overlap against active confirmed bookings, calculates estimated cost, and stages a temporary reservation in the guest cart.
+
+  ---
+  ### gRPC Method Specification
+  - **Service**: `rental.RentalService`
+  - **Method**: `book_property`
+  - **Type**: Unary RPC
+  - **URL / Path**: `{{grpc_host}}:{{grpc_port}}/rental.RentalService/book_property`
+
+  ---
+  ### Request Payload (`BookPropertyRequest`)
+  - `assetTag` (*string*): Listing identifier to book.
+  - `guestId` (*string*): Registered guest identifier.
+  - `checkInDate` (*string*): Arrival date (`YYYY-MM-DD`).
+  - `checkOutDate` (*string*): Departure date (`YYYY-MM-DD`).
+
+  ---
+  ### Automated Test Assertions
+  1. **Success Confirmation**: Asserts `success` is `true`.
+  2. **Booking ID Capture**: Saves `bookingId` to `{{bookingId}}` for downstream finalisation.
+  3. **Estimated Cost Calculation**: Validates `estimatedCost > 0`.
+order: 6000
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Temporary booking placed successfully", function () {
+          var res = pm.response.json();
+          pm.expect(res.success).to.be.true;
+          pm.expect(res).to.have.property("bookingId");
+          if (res.bookingId) {
+              pm.environment.set("bookingId", res.bookingId);
+          }
+      });
+      pm.test("Estimated cost calculated correctly", function () {
+          var res = pm.response.json();
+          pm.expect(res.estimatedCost).to.be.above(0);
+      });

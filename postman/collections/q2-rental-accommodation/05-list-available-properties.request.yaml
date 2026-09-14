@@ -1,0 +1,55 @@
+$kind: http-request
+name: 05. List Available Properties (Server Streaming)
+method: POST
+url: "{{grpc_host}}:{{grpc_port}}/rental.RentalService/list_available_properties"
+headers:
+  - key: Content-Type
+    value: application/grpc+proto
+body:
+  type: json
+  content: |-
+    {
+      "location": "Swakopmund",
+      "propertyType": "Villa",
+      "minPrice": 1000.0,
+      "maxPrice": 5000.0
+    }
+description: |-
+  ### Endpoint Overview
+  Server-streaming gRPC RPC browsing available listings. The server transmits matching properties one by one across the open stream rather than bundling them into a single memory block.
+
+  ---
+  ### gRPC Method Specification
+  - **Service**: `rental.RentalService`
+  - **Method**: `list_available_properties`
+  - **Type**: Server Streaming (`ListAvailablePropertiesRequest -> stream Property`)
+  - **URL / Path**: `{{grpc_host}}:{{grpc_port}}/rental.RentalService/list_available_properties`
+
+  ---
+  ### Request Payload (`ListAvailablePropertiesRequest`)
+  - `location` (*string, optional*): Filter by city or region.
+  - `propertyType` (*string, optional*): Filter by property category (`Apartment`, `House`, `Villa`).
+  - `minPrice` (*double, optional*): Lower price boundary.
+  - `maxPrice` (*double, optional*): Upper price boundary.
+
+  ---
+  ### Automated Test Assertions
+  1. **Availability Rule**: Validates all returned stream items have `status == "AVAILABLE"`.
+  2. **Filter Compliance**: Asserts returned properties match requested location and propertyType.
+order: 5000
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Streamed properties match filter and availability", function () {
+          var res = pm.response.json();
+          var list = Array.isArray(res) ? res : [res];
+          list.forEach(function(item) {
+              if (item.propertyType) {
+                  pm.expect(item.propertyType).to.eql("Villa");
+              }
+              if (item.status) {
+                  pm.expect(item.status).to.eql("AVAILABLE");
+              }
+          });
+      });

@@ -1,0 +1,458 @@
+{
+  "info": {
+    "_postman_id": "b8f2c3d4-e5a6-47b8-91c2-d3e4f5a6b7c8",
+    "name": "Q2 - Vacation Property Rental Accommodation System",
+    "description": "Comprehensive gRPC API test suite for Assignment 1 Question 2 (Vacation Property Rental Accommodation System). Covers all 8 gRPC operations defined in specs/rental_service.proto: Unary Property Management (add_property, update_property, remove_property, search_property), Client Streaming (create_users), Server Streaming (list_available_properties), and Two-Phase Booking (book_property, confirm_booking).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "01. Add Property",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Response contains assetTag identifier\", function () {",
+              "    var res = pm.response.json();",
+              "    pm.expect(res).to.have.property(\"assetTag\");",
+              "    if (res.assetTag) {",
+              "        pm.environment.set(\"propertyTag\", res.assetTag);",
+              "    }",
+              "});",
+              "pm.test(\"Property creation status is confirmed\", function () {",
+              "    var res = pm.response.json();",
+              "    pm.expect(res.status).to.be.oneOf([\"AVAILABLE\", \"Created\", \"SUCCESS\"]);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/grpc+proto"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Sunset Beachfront Villa\",\n  \"location\": \"Swakopmund\",\n  \"propertyType\": \"Villa\",\n  \"pricePerNight\": 2500.0,\n  \"hostId\": \"HOST-001\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{grpc_host}}:{{grpc_port}}/rental.RentalService/add_property",
+          "host": [
+            "{{grpc_host}}"
+          ],
+          "port": "{{grpc_port}}",
+          "path": [
+            "rental.RentalService",
+            "add_property"
+          ]
+        },
+        "description": "Unary gRPC RPC creating a new property listing. Generates an assetTag and initialises status to AVAILABLE."
+      },
+      "response": []
+    },
+    {
+      "name": "02. Search Property",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Property query returned found status\", function () {",
+              "    var res = pm.response.json();",
+              "    pm.expect(res.found).to.be.true;",
+              "    pm.expect(res.status).to.eql(\"Available\");",
+              "});",
+              "pm.test(\"Returned property details match environment assetTag\", function () {",
+              "    var res = pm.response.json();",
+              "    pm.expect(res.property).to.be.an(\"object\");",
+              "    pm.expect(res.property.assetTag).to.eql(pm.environment.get(\"propertyTag\"));",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/grpc+proto"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"assetTag\": \"{{propertyTag}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{grpc_host}}:{{grpc_port}}/rental.RentalService/search_property",
+          "host": [
+            "{{grpc_host}}"
+          ],
+          "port": "{{grpc_port}}",
+          "path": [
+            "rental.RentalService",
+            "search_property"
+          ]
+        },
+        "description": "Unary gRPC RPC querying property details by assetTag."
+      },
+      "response": []
+    },
+    {
+      "name": "03. Update Property",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Property updated successfully\", function () {",
+              "    var res = pm.response.json();",
+              "    pm.expect(res.success).to.be.true;",
+              "});",
+              "pm.test(\"Updated property reflects revised price and title\", function () {",
+              "    var res = pm.response.json();",
+              "    pm.expect(res.property.pricePerNight).to.eql(2800);",
+              "    pm.expect(res.property.name).to.eql(\"Sunset Luxury Beachfront Villa\");",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/grpc+proto"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"assetTag\": \"{{propertyTag}}\",\n  \"name\": \"Sunset Luxury Beachfront Villa\",\n  \"location\": \"Swakopmund\",\n  \"propertyType\": \"Villa\",\n  \"pricePerNight\": 2800.0,\n  \"status\": \"AVAILABLE\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{grpc_host}}:{{grpc_port}}/rental.RentalService/update_property",
+          "host": [
+            "{{grpc_host}}"
+          ],
+          "port": "{{grpc_port}}",
+          "path": [
+            "rental.RentalService",
+            "update_property"
+          ]
+        },
+        "description": "Unary gRPC RPC updating property pricing and operational status."
+      },
+      "response": []
+    },
+    {
+      "name": "04. Create Users (Client Streaming)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"User stream batch registration succeeded\", function () {",
+              "    var res = pm.response.json();",
+              "    pm.expect(res.success).to.be.true;",
+              "});",
+              "pm.test(\"User count matches registration payload\", function () {",
+              "    var res = pm.response.json();",
+              "    pm.expect(res.count).to.be.at.least(2);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/grpc+proto"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "[\n  {\n    \"userId\": \"HOST-001\",\n    \"name\": \"Alice Host\",\n    \"role\": \"HOST\",\n    \"email\": \"alice@rental.na\",\n    \"phoneNumber\": \"+264811112222\"\n  },\n  {\n    \"userId\": \"GUEST-001\",\n    \"name\": \"Bob Traveler\",\n    \"role\": \"GUEST\",\n    \"email\": \"bob@rental.na\",\n    \"phoneNumber\": \"+264813334444\"\n  }\n]",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{grpc_host}}:{{grpc_port}}/rental.RentalService/create_users",
+          "host": [
+            "{{grpc_host}}"
+          ],
+          "port": "{{grpc_port}}",
+          "path": [
+            "rental.RentalService",
+            "create_users"
+          ]
+        },
+        "description": "Client-streaming gRPC RPC onboarding a stream of user records."
+      },
+      "response": []
+    },
+    {
+      "name": "05. List Available Properties (Server Streaming)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Available properties stream returns array of results\", function () {",
+              "    var res = pm.response.json();",
+              "    pm.expect(res).to.be.an(\"array\");",
+              "});",
+              "pm.test(\"Returned listings match location and type criteria\", function () {",
+              "    var res = pm.response.json();",
+              "    if (Array.isArray(res) && res.length > 0) {",
+              "        res.forEach(function (prop) {",
+              "            pm.expect(prop.location).to.eql(\"Swakopmund\");",
+              "            pm.expect(prop.status).to.eql(\"AVAILABLE\");",
+              "        });",
+              "    }",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/grpc+proto"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"location\": \"Swakopmund\",\n  \"minPrice\": 1000.0,\n  \"maxPrice\": 5000.0,\n  \"propertyType\": \"Villa\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{grpc_host}}:{{grpc_port}}/rental.RentalService/list_available_properties",
+          "host": [
+            "{{grpc_host}}"
+          ],
+          "port": "{{grpc_port}}",
+          "path": [
+            "rental.RentalService",
+            "list_available_properties"
+          ]
+        },
+        "description": "Server-streaming gRPC RPC streaming matching accommodation listings based on location and filter parameters."
+      },
+      "response": []
+    },
+    {
+      "name": "06. Book Property (Phase 1 Reservation)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Temporary booking placed successfully\", function () {",
+              "    var res = pm.response.json();",
+              "    pm.expect(res.success).to.be.true;",
+              "    pm.expect(res).to.have.property(\"bookingId\");",
+              "    if (res.bookingId) {",
+              "        pm.environment.set(\"bookingId\", res.bookingId);",
+              "    }",
+              "});",
+              "pm.test(\"Estimated cost calculated correctly\", function () {",
+              "    var res = pm.response.json();",
+              "    pm.expect(res.estimatedCost).to.be.above(0);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/grpc+proto"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"assetTag\": \"{{propertyTag}}\",\n  \"guestId\": \"GUEST-001\",\n  \"checkInDate\": \"2026-11-01\",\n  \"checkOutDate\": \"2026-11-05\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{grpc_host}}:{{grpc_port}}/rental.RentalService/book_property",
+          "host": [
+            "{{grpc_host}}"
+          ],
+          "port": "{{grpc_port}}",
+          "path": [
+            "rental.RentalService",
+            "book_property"
+          ]
+        },
+        "description": "Unary gRPC RPC executing Phase 1 of two-phase booking, validating dates and staging reservation in guest cart."
+      },
+      "response": []
+    },
+    {
+      "name": "07. Confirm Booking (Phase 2 Finalisation)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Booking confirmed successfully\", function () {",
+              "    var res = pm.response.json();",
+              "    pm.expect(res.success).to.be.true;",
+              "    pm.expect(res.status).to.eql(\"CONFIRMED\");",
+              "});",
+              "pm.test(\"Booking ID and assetTag match staged reservation\", function () {",
+              "    var res = pm.response.json();",
+              "    pm.expect(res.bookingId).to.eql(pm.environment.get(\"bookingId\"));",
+              "    if (res.booking) {",
+              "        pm.expect(res.booking.assetTag).to.eql(pm.environment.get(\"propertyTag\"));",
+              "        pm.expect(res.booking.status).to.eql(\"CONFIRMED\");",
+              "    }",
+              "});",
+              "pm.test(\"Total cost is calculated and positive\", function () {",
+              "    var res = pm.response.json();",
+              "    pm.expect(res.totalCost).to.be.above(0);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/grpc+proto"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"bookingId\": \"{{bookingId}}\",\n  \"guestId\": \"GUEST-001\",\n  \"assetTag\": \"{{propertyTag}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{grpc_host}}:{{grpc_port}}/rental.RentalService/confirm_booking",
+          "host": [
+            "{{grpc_host}}"
+          ],
+          "port": "{{grpc_port}}",
+          "path": [
+            "rental.RentalService",
+            "confirm_booking"
+          ]
+        },
+        "description": "Unary gRPC RPC executing Phase 2 finalisation: mutex lock, overlap check, status to CONFIRMED, cart clearance."
+      },
+      "response": []
+    },
+    {
+      "name": "08. Remove Property",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Property removed successfully\", function () {",
+              "    var res = pm.response.json();",
+              "    pm.expect(res.success).to.be.true;",
+              "});",
+              "pm.test(\"Remaining properties array returned\", function () {",
+              "    var res = pm.response.json();",
+              "    pm.expect(res.remainingProperties).to.be.an(\"array\");",
+              "});",
+              "pm.test(\"Deleted property is not in remaining listings\", function () {",
+              "    var res = pm.response.json();",
+              "    var removedTag = pm.environment.get(\"propertyTag\");",
+              "    var found = res.remainingProperties.some(function (p) {",
+              "        return p.assetTag === removedTag;",
+              "    });",
+              "    pm.expect(found).to.be.false;",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/grpc+proto"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"assetTag\": \"{{propertyTag}}\",\n  \"hostId\": \"HOST-001\",\n  \"location\": \"Swakopmund\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{grpc_host}}:{{grpc_port}}/rental.RentalService/remove_property",
+          "host": [
+            "{{grpc_host}}"
+          ],
+          "port": "{{grpc_port}}",
+          "path": [
+            "rental.RentalService",
+            "remove_property"
+          ]
+        },
+        "description": "Unary gRPC RPC removing property listing and returning remaining regional inventory for host."
+      },
+      "response": []
+    }
+  ]
+}

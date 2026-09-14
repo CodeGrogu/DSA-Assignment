@@ -1,0 +1,59 @@
+$kind: http-request
+name: 07. Confirm Booking (Phase 2 Finalisation)
+method: POST
+url: "{{grpc_host}}:{{grpc_port}}/rental.RentalService/confirm_booking"
+headers:
+  - key: Content-Type
+    value: application/grpc+proto
+body:
+  type: json
+  content: |-
+    {
+      "bookingId": "{{bookingId}}",
+      "guestId": "GUEST-001",
+      "assetTag": "{{propertyTag}}"
+    }
+description: |-
+  ### Endpoint Overview
+  Unary gRPC RPC executing Phase 2 of the two-phase booking architecture. Finalises a staged cart reservation, conducts final overlap checks against active bookings, transitions reservation status to `CONFIRMED`, computes the final total cost, and purges the reservation from the temporary guest cart.
+
+  ---
+  ### gRPC Method Specification
+  - **Service**: `rental.RentalService`
+  - **Method**: `confirm_booking`
+  - **Type**: Unary RPC
+  - **URL / Path**: `{{grpc_host}}:{{grpc_port}}/rental.RentalService/confirm_booking`
+
+  ---
+  ### Request Payload (`ConfirmBookingRequest`)
+  - `bookingId` (*string*): Pending booking reservation identifier captured from Phase 1.
+  - `guestId` (*string*): Registered guest identifier matching the cart reservation.
+  - `assetTag` (*string*): Property identifier being confirmed.
+
+  ---
+  ### Automated Test Assertions
+  1. **Success Status**: Asserts `success` is `true` and status is `CONFIRMED`.
+  2. **Booking ID Parity**: Validates returned `bookingId` matches the staged reservation.
+  3. **Total Cost Assertion**: Confirms `totalCost` is greater than zero.
+order: 7000
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Booking confirmed successfully", function () {
+          var res = pm.response.json();
+          pm.expect(res.success).to.be.true;
+          pm.expect(res.status).to.eql("CONFIRMED");
+      });
+      pm.test("Booking ID and assetTag match staged reservation", function () {
+          var res = pm.response.json();
+          pm.expect(res.bookingId).to.eql(pm.environment.get("bookingId"));
+          if (res.booking) {
+              pm.expect(res.booking.assetTag).to.eql(pm.environment.get("propertyTag"));
+              pm.expect(res.booking.status).to.eql("CONFIRMED");
+          }
+      });
+      pm.test("Total cost is calculated and positive", function () {
+          var res = pm.response.json();
+          pm.expect(res.totalCost).to.be.above(0);
+      });
