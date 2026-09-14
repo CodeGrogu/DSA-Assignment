@@ -1,4 +1,5 @@
 import ballerina/regex;
+import ballerina/time;
 
 public type AssetStatus "AVAILABLE"|"LOANED_OUT"|"OCCUPIED"|"UNDER_MAINTENANCE"|"DISPOSED";
 
@@ -62,5 +63,10 @@ public isolated function isValidWorkOrderStatus(string statusStr) returns boolea
 }
 
 public isolated function isValidIsoDate(string dateStr) returns boolean {
-    return regex:matches(dateStr, "^\\d{4}-\\d{2}-\\d{2}$");
+    if !regex:matches(dateStr, "^\\d{4}-\\d{2}-\\d{2}$") {
+        return false;
+    }
+    time:Civil|error civil = time:civilFromString(dateStr + "T00:00:00Z");
+    return civil is time:Civil;
 }
+

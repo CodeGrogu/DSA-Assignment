@@ -142,6 +142,53 @@ public client class LibraryClient {
     public isolated function updateWorkOrder(string assetTag, string orderId, WorkOrder workOrder) returns WorkOrder|error {
         return self.httpClient->put(string `/assets/${assetTag}/work-orders/${orderId}`, workOrder);
     }
+
+    # Adds a sub-task to an existing work order.
+    # + assetTag - Unique asset tag
+    # + orderId - Work order identifier
+    # + task - Task payload
+    # + return - Created task or error
+    public isolated function addTask(string assetTag, string orderId, Task task) returns Task|error {
+        return self.httpClient->post(string `/assets/${assetTag}/work-orders/${orderId}/tasks`, task);
+    }
+
+    # Updates a sub-task's completion status within a work order.
+    # + assetTag - Unique asset tag
+    # + orderId - Work order identifier
+    # + taskId - Unique task identifier
+    # + completed - New completion status
+    # + return - Updated work order or error
+    public isolated function updateTaskStatus(string assetTag, string orderId, string taskId, boolean completed) returns WorkOrder|error {
+        return self.httpClient->patch(string `/assets/${assetTag}/work-orders/${orderId}/tasks/${taskId}`, {completed: completed});
+    }
+
+    # Closes a work order once all its tasks are completed.
+    # + assetTag - Unique asset tag
+    # + orderId - Unique work order identifier
+    # + return - Closed work order or error
+    public isolated function closeWorkOrder(string assetTag, string orderId) returns WorkOrder|error {
+        return self.httpClient->post(string `/assets/${assetTag}/work-orders/${orderId}/close`, ());
+    }
+
+    # Retrieves all registered institutions.
+    # + return - Array of institutions or error
+    public isolated function getAllInstitutions() returns Institution[]|error {
+        return self.httpClient->/institutions;
+    }
+
+    # Registers a new institution.
+    # + institution - Institution payload
+    # + return - Created institution or error
+    public isolated function addInstitution(Institution institution) returns Institution|error {
+        return self.httpClient->/institutions.post(institution);
+    }
+
+    # Removes an institution by unique ID.
+    # + id - Institution ID
+    # + return - JSON confirmation response or error
+    public isolated function deleteInstitution(string id) returns json|error {
+        return self.httpClient->/institutions/[id].delete();
+    }
 }
 
 # Entry point for the CLI client application.
@@ -235,6 +282,73 @@ function executeCliCommand(LibraryClient clientInstance, string[] args) returns 
                 io:println("Usage: bal run -- delete <assetTag>");
             }
         }
+        "workorder" => {
+            if args.length() > 3 && args[1] == "create" {
+                string tag = args[2];
+                string orderId = args[3];
+                string desc = args.length() > 4 ? args[4] : "Maintenance work order";
+                WorkOrder wo = {orderId: orderId, status: "OPEN", description: desc, tasks: []};
+                WorkOrder|error res = clientInstance.createWorkOrder(tag, wo);
+                if res is WorkOrder {
+                    io:println(string `Created work order [${res.orderId}] on asset [${tag}]`);
+                } else {
+                    io:println("Failed to create work order: ", res.message());
+                }
+            } else if args.length() > 2 && args[1] == "close" {
+                string tag = args[2];
+                string orderId = args.length() > 3 ? args[3] : "";
+                if orderId.length() == 0 {
+                    io:println("Usage: bal run -- workorder close <assetTag> <orderId>");
+                } else {
+                    WorkOrder|error res = clientInstance.closeWorkOrder(tag, orderId);
+                    if res is WorkOrder {
+                        io:println(string `Work order [${res.orderId}] successfully closed.`);
+                    } else {
+                        io:println("Failed to close work order: ", res.message());
+                    }
+                }
+            } else {
+                io:println("Usage: bal run -- workorder create <assetTag> <orderId> [desc] | workorder close <assetTag> <orderId>");
+            }
+        }
+        "task" => {
+            if args.length() > 4 && args[1] == "add" {
+                string tag = args[2];
+                string orderId = args[3];
+                string taskId = args[4];
+                string desc = args.length() > 5 ? args[5] : "Work order task";
+                Task t = {taskId: taskId, description: desc, completed: false};
+                Task|error res = clientInstance.addTask(tag, orderId, t);
+                if res is Task {
+                    io:println(string `Added task [${res.taskId}] to work order [${orderId}]`);
+                } else {
+                    io:println("Failed to add task: ", res.message());
+                }
+            } else if args.length() > 4 && args[1] == "complete" {
+                string tag = args[2];
+                string orderId = args[3];
+                string taskId = args[4];
+                WorkOrder|error res = clientInstance.updateTaskStatus(tag, orderId, taskId, true);
+                if res is WorkOrder {
+                    io:println(string `Task [${taskId}] marked complete on work order [${orderId}].`);
+                } else {
+                    io:println("Failed to update task: ", res.message());
+                }
+            } else {
+                io:println("Usage: bal run -- task add <assetTag> <orderId> <taskId> [desc] | task complete <assetTag> <orderId> <taskId>");
+            }
+        }
+        "institutions" => {
+            Institution[]|error insts = clientInstance.getAllInstitutions();
+            if insts is Institution[] {
+                io:println(string `Found ${insts.length()} institution(s):`);
+                foreach Institution inst in insts {
+                    io:println(string `  - [${inst.id}] ${inst.name}`);
+                }
+            } else {
+                io:println("Failed to retrieve institutions: ", insts.message());
+            }
+        }
         "help" => {
             printUsage();
         }
@@ -269,9 +383,15 @@ function runInteractiveMenu(LibraryClient clientInstance) returns error? {
         io:println("8. View Overdue Maintenance Assets");
         io:println("9. Attach Component to Asset");
         io:println("10. Attach Schedule to Asset");
+        io:println("11. Create Work Order for Asset");
+        io:println("12. Add Task to Work Order");
+        io:println("13. Mark Task Completed");
+        io:println("14. Close Work Order");
+        io:println("15. List Institutions");
+        io:println("16. Add Institution");
         io:println("0. Exit");
 
-        string input = io:readln("Select an option (0-10): ");
+        string input = io:readln("Select an option (0-16): ");
         string choice = input.trim();
 
         // Guard against infinite loop on EOF or piped stdin
@@ -281,7 +401,7 @@ function runInteractiveMenu(LibraryClient clientInstance) returns error? {
                 io:println("Multiple empty inputs or EOF detected. Exiting client.");
                 break;
             }
-            io:println("No selection entered. Please choose an option (0-10).");
+            io:println("No selection entered. Please choose an option (0-16).");
             continue;
         }
         emptyInputCount = 0;
@@ -452,12 +572,91 @@ function runInteractiveMenu(LibraryClient clientInstance) returns error? {
                     io:println("Failed to attach schedule: ", res.message());
                 }
             }
+            "11" => {
+                string tag = io:readln("Enter assetTag: ").trim();
+                string orderId = io:readln("Work Order ID (e.g. WO-01): ").trim();
+                string desc = io:readln("Work Order Description: ").trim();
+                string compId = io:readln("Component ID (optional, leave blank if none): ").trim();
+
+                WorkOrder wo = {
+                    orderId: orderId,
+                    status: "OPEN",
+                    description: desc,
+                    compId: compId.length() > 0 ? compId : (),
+                    tasks: []
+                };
+                WorkOrder|error res = clientInstance.createWorkOrder(tag, wo);
+                if res is WorkOrder {
+                    io:println(string `Successfully created work order [${res.orderId}] on asset [${tag}]`);
+                } else {
+                    io:println("Failed to create work order: ", res.message());
+                }
+            }
+            "12" => {
+                string tag = io:readln("Enter assetTag: ").trim();
+                string orderId = io:readln("Enter Work Order ID: ").trim();
+                string taskId = io:readln("Task ID (e.g. T-01): ").trim();
+                string desc = io:readln("Task Description: ").trim();
+
+                Task t = {taskId: taskId, description: desc, completed: false};
+                Task|error res = clientInstance.addTask(tag, orderId, t);
+                if res is Task {
+                    io:println(string `Successfully added task [${res.taskId}] to work order [${orderId}]`);
+                } else {
+                    io:println("Failed to add task: ", res.message());
+                }
+            }
+            "13" => {
+                string tag = io:readln("Enter assetTag: ").trim();
+                string orderId = io:readln("Enter Work Order ID: ").trim();
+                string taskId = io:readln("Enter Task ID to complete: ").trim();
+
+                WorkOrder|error res = clientInstance.updateTaskStatus(tag, orderId, taskId, true);
+                if res is WorkOrder {
+                    io:println(string `Task [${taskId}] marked complete on work order [${orderId}].`);
+                } else {
+                    io:println("Failed to update task: ", res.message());
+                }
+            }
+            "14" => {
+                string tag = io:readln("Enter assetTag: ").trim();
+                string orderId = io:readln("Enter Work Order ID to close: ").trim();
+
+                WorkOrder|error res = clientInstance.closeWorkOrder(tag, orderId);
+                if res is WorkOrder {
+                    io:println(string `Successfully closed work order [${res.orderId}]. Status: ${res.status}`);
+                } else {
+                    io:println("Failed to close work order: ", res.message());
+                }
+            }
+            "15" => {
+                Institution[]|error insts = clientInstance.getAllInstitutions();
+                if insts is Institution[] {
+                    io:println(string `Found ${insts.length()} institution(s):`);
+                    foreach Institution inst in insts {
+                        io:println(string `  - [${inst.id}] ${inst.name}`);
+                    }
+                } else {
+                    io:println("Failed to retrieve institutions: ", insts.message());
+                }
+            }
+            "16" => {
+                string id = io:readln("Institution ID (e.g. INST-01): ").trim();
+                string name = io:readln("Institution Name: ").trim();
+                Institution inst = {id: id, name: name};
+                Institution|error res = clientInstance.addInstitution(inst);
+                if res is Institution {
+                    io:println(string `Successfully added institution [${res.id}]: ${res.name}`);
+                } else {
+                    io:println("Failed to add institution: ", res.message());
+                }
+            }
             "0" => {
                 io:println("Exiting Library Client. Goodbye!");
                 running = false;
             }
             _ => {
-                io:println("Invalid option. Please choose between 0 and 10.");
+                io:println("Invalid option. Please choose between 0 and 16.");
             }
         }
     }
@@ -466,12 +665,17 @@ function runInteractiveMenu(LibraryClient clientInstance) returns error? {
 # Prints usage instructions for direct CLI arguments.
 function printUsage() {
     io:println("Usage:");
-    io:println("  bal run                          # Run interactive menu");
-    io:println("  bal run -- health                # Check service health");
-    io:println("  bal run -- list [inst] [site]    # List assets with optional filtering");
-    io:println("  bal run -- get <assetTag>        # Inspect asset by tag");
-    io:println("  bal run -- overdue [date]        # View overdue maintenance assets");
-    io:println("  bal run -- status <assetTag>     # View asset operational status");
-    io:println("  bal run -- delete <assetTag>     # Delete an asset");
-    io:println("  bal run -- help                  # Show this help message");
+    io:println("  bal run                                      # Run interactive menu");
+    io:println("  bal run -- health                            # Check service health");
+    io:println("  bal run -- list [inst] [site]                # List assets with optional filtering");
+    io:println("  bal run -- get <assetTag>                    # Inspect asset by tag");
+    io:println("  bal run -- overdue [date]                    # View overdue maintenance assets");
+    io:println("  bal run -- status <assetTag>                 # View asset operational status");
+    io:println("  bal run -- delete <assetTag>                 # Delete an asset");
+    io:println("  bal run -- workorder create <tag> <id> [desc]# Create work order");
+    io:println("  bal run -- workorder close <tag> <id>        # Close work order");
+    io:println("  bal run -- task add <tag> <woId> <id> [desc] # Add task to work order");
+    io:println("  bal run -- task complete <tag> <woId> <id>   # Mark task as completed");
+    io:println("  bal run -- institutions                      # List all institutions");
+    io:println("  bal run -- help                              # Show this help message");
 }
