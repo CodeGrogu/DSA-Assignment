@@ -91,3 +91,127 @@ tbody tr:hover {
 .status-OCCUPIED    { background: #dbeafe; color: #1e40af; }
 .status-UNDER_MAINTENANCE { background: #fee2e2; color: #991b1b; }
 .status-DISPOSED    { background: #e5e7eb; color: #4b5563; }
+
+#detail-panel {
+    border-left: 4px solid #2563eb;
+}
+
+#detail-panel h3 {
+    margin-top: 20px;
+    margin-bottom: 8px;
+    font-size: 15px;
+    color: #374151;
+}
+
+#detail-panel button.secondary {
+    background: #e5e7eb;
+    color: #374151;
+    margin-left: 8px;
+}
+
+#detail-panel button.secondary:hover {
+    background: #d1d5db;
+}
+
+#detail-meta {
+    margin-top: 12px;
+}
+
+#detail-meta dt {
+    font-weight: 600;
+    color: #6b7280;
+    font-size: 12px;
+    text-transform: uppercase;
+    margin-top: 8px;
+}
+
+#detail-meta dd {
+    margin-left: 0;
+    font-size: 14px;
+}
+
+#detail-actions {
+    margin-top: 16px;
+    display: flex;
+    gap: 8px;
+}
+
+#schedule-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+#schedule-form input,
+#schedule-form select {
+    padding: 6px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+#schedule-list,
+#component-list,
+#workorder-list {
+    list-style: none;
+    padding: 0;
+}
+
+#schedule-list li,
+#component-list li,
+#workorder-list li {
+    padding: 8px 12px;
+    background: #f9fafb;
+    border-radius: 4px;
+    margin-bottom: 6px;
+    font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+#schedule-list button,
+#component-list button,
+#workorder-list button {
+    font-size: 12px;
+    padding: 4px 10px;
+    background: #dc2626;
+}
+
+#schedule-list button:hover,
+#component-list button:hover,
+#workorder-list button:hover {
+    background: #b91c1c;
+}
+
+.filter-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.filter-row input {
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 14px;
+    min-width: 220px;
+}
+
+button.secondary {
+    background: #e5e7eb;
+    color: #374151;
+}
+
+button.secondary:hover {
+    background: #d1d5db;
+}
+
+.hint {
+    color: #6b7280;
+    font-size: 12px;
+    margin-top: 8px;
+}

@@ -18,6 +18,17 @@
             <pre id="health-output">Not checked yet.</pre>
         </section>
 
+        <section id="filter-panel">
+            <h2>Filter Assets</h2>
+            <div class="filter-row">
+                <input type="text" id="filter-institution" placeholder="Institution (exact match)">
+                <input type="text" id="filter-site" placeholder="Site (exact match)">
+                <button id="apply-filter">Apply Filter</button>
+                <button id="clear-filter" class="secondary">Clear</button>
+            </div>
+            <p class="hint">Leave both blank to see all assets. Values must match exactly (case-sensitive).</p>
+        </section>
+        
                 <section id="assets-panel">
             <h2>All Assets</h2>
             <button id="load-assets">Load Assets</button>
@@ -35,6 +46,38 @@
                 <tbody id="assets-tbody"></tbody>
             </table>
         </section>
+
+            <section id="detail-panel" hidden>
+            <h2 id="detail-title">Asset Detail</h2>
+            <button id="close-detail" class="secondary">Close</button>
+
+            <div id="detail-meta"></div>
+
+            <div id="detail-actions">
+                <button id="btn-loan-out">Loan Out</button>
+                <button id="btn-return">Return / Mark Available</button>
+            </div>
+
+            <h3>Schedules</h3>
+            <form id="schedule-form">
+                <input type="text" id="sched-id" placeholder="Schedule ID (e.g. SCH-900)" required>
+                <input type="date" id="sched-due" required>
+                <select id="sched-type">
+                    <option value="BOOKING">BOOKING</option>
+                    <option value="MAINTENANCE">MAINTENANCE</option>
+                    <option value="SERVICING">SERVICING</option>
+                </select>
+                <input type="text" id="sched-details" placeholder="Details / booked for" required>
+                <button type="submit">Add Schedule</button>
+            </form>
+            <ul id="schedule-list"></ul>
+
+            <h3>Components</h3>
+            <ul id="component-list"></ul>
+
+            <h3>Work Orders</h3>
+            <ul id="workorder-list"></ul>
+        </section>    
     </main>
 
     <script src="app.js"></script>
