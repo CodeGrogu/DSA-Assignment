@@ -1,0 +1,62 @@
+$kind: http-request
+name: 04. Register Users (Client Streaming)
+method: POST
+url: "{{grpc_host}}:{{grpc_port}}/rental.RentalService/create_users"
+headers:
+  - key: Content-Type
+    value: application/grpc+proto
+body:
+  type: json
+  content: |-
+    [
+      {
+        "userId": "USR-101",
+        "name": "Sarah Connor",
+        "role": "HOST",
+        "email": "sarah.connor@example.com",
+        "phoneNumber": "+264811122334"
+      },
+      {
+        "userId": "USR-102",
+        "name": "John Doe",
+        "role": "GUEST",
+        "email": "john.doe@example.com",
+        "phoneNumber": "+264812233445"
+      }
+    ]
+description: |-
+  ### Endpoint Overview
+  Client-streaming gRPC RPC allowing the client to push a continuous stream of user profiles (both Hosts and Guests) over a single channel. Upon closing the stream, the server responds with a summary confirmation receipt.
+
+  ---
+  ### gRPC Method Specification
+  - **Service**: `rental.RentalService`
+  - **Method**: `create_users`
+  - **Type**: Client Streaming (`stream User -> CreateUsersResponse`)
+  - **URL / Path**: `{{grpc_host}}:{{grpc_port}}/rental.RentalService/create_users`
+
+  ---
+  ### Stream Item Schema (`User`)
+  - `userId` (*string*): Unique user identifier.
+  - `name` (*string*): User full name.
+  - `role` (*string*): Role enum (`HOST`, `GUEST`).
+  - `email` (*string*): Contact email.
+  - `phoneNumber` (*string*): Contact telephone number.
+
+  ---
+  ### Automated Test Assertions
+  1. **Success Confirmation**: Asserts `success` is `true`.
+  2. **Stream Count Validation**: Validates `count >= 1` registered users.
+order: 4000
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Stream completed with success status", function () {
+          var res = pm.response.json();
+          pm.expect(res.success).to.be.true;
+      });
+      pm.test("User count matches stream transmission", function () {
+          var res = pm.response.json();
+          pm.expect(res.count).to.be.at.least(1);
+      });

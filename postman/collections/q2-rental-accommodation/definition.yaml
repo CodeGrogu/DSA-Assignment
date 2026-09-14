@@ -1,0 +1,9 @@
+$kind: collection
+name: Q2 - Vacation Property Rental Accommodation System
+description: |-
+  Comprehensive gRPC API test suite for Assignment 1 Question 2 (Vacation Property Rental Accommodation System).
+  Covers all 8 gRPC operations defined in `specs/rental_service.proto`:
+  - Unary Property Management: add_property, update_property, remove_property, search_property
+  - Client-Streaming: create_users (bulk user onboarding)
+  - Server-Streaming: list_available_properties (real-time browsing)
+  - Two-Phase Reservation: book_property (cart staging) and confirm_booking (mutex-locked finalisation)

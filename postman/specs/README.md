@@ -2,13 +2,15 @@
 
 This directory houses official API schema definitions and contracts for the **PeerPressure** workspace in Postman Local Mode.
 
-## Specifications Catalog
+---
+
+## Specifications Catalogue
 
 ### 1. `rental_service.proto` (Question 2: Rental Accommodation System)
-* **Format**: Protocol Buffers v3 (`proto3`)
-* **Package**: `rental`
-* **Service**: `RentalService`
-* **Operations**:
+- **Format**: Protocol Buffers v3 (`proto3`)
+- **Package**: `rental`
+- **Service**: `RentalService`
+- **Operations**:
   1. `add_property` (Unary)
   2. `update_property` (Unary)
   3. `remove_property` (Unary)
@@ -18,6 +20,8 @@ This directory houses official API schema definitions and contracts for the **Pe
   7. `book_property` (Unary)
   8. `confirm_booking` (Unary)
 
+---
+
 ## How to Import in Postman Local Mode
 
 1. Open Postman desktop app with the repository in Local Mode.
@@ -25,3 +29,4 @@ This directory houses official API schema definitions and contracts for the **Pe
 3. Select **Import a .proto file** and choose `postman/specs/rental_service.proto`.
 4. Set the server URL using the environment variable `{{grpc_host}}:{{grpc_port}}` (e.g. `localhost:9090`).
 5. Select any of the 8 RPC methods from the dropdown to invoke unary, client-streaming, or server-streaming requests.
+6. Alternatively, use the automated test collection located at `postman/collections/q2-rental-accommodation/`.

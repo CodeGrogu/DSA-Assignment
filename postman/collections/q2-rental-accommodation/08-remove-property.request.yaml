@@ -1,0 +1,58 @@
+$kind: http-request
+name: 08. Remove Property
+method: POST
+url: "{{grpc_host}}:{{grpc_port}}/rental.RentalService/remove_property"
+headers:
+  - key: Content-Type
+    value: application/grpc+proto
+body:
+  type: json
+  content: |-
+    {
+      "assetTag": "{{propertyTag}}",
+      "hostId": "HOST-001",
+      "location": "Swakopmund"
+    }
+description: |-
+  ### Endpoint Overview
+  Unary gRPC RPC removing an accommodation listing from the platform. Verifies host ownership, removes the property from the in-memory catalogue, and returns the list of remaining active properties owned by the host in that specified region.
+
+  ---
+  ### gRPC Method Specification
+  - **Service**: `rental.RentalService`
+  - **Method**: `remove_property`
+  - **Type**: Unary RPC
+  - **URL / Path**: `{{grpc_host}}:{{grpc_port}}/rental.RentalService/remove_property`
+
+  ---
+  ### Request Payload (`RemovePropertyRequest`)
+  - `assetTag` (*string*): Identifier of the property listing to remove.
+  - `hostId` (*string*): Identifier of the host requesting deletion (must match owner).
+  - `location` (*string*): Geographic region to return remaining properties for.
+
+  ---
+  ### Automated Test Assertions
+  1. **Success Confirmation**: Asserts `success` is `true`.
+  2. **Remaining Properties Array**: Validates `remainingProperties` is an array.
+  3. **Deleted Asset Absence**: Asserts the removed `assetTag` is no longer present in `remainingProperties`.
+order: 8000
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Property removed successfully", function () {
+          var res = pm.response.json();
+          pm.expect(res.success).to.be.true;
+      });
+      pm.test("Remaining properties array returned", function () {
+          var res = pm.response.json();
+          pm.expect(res.remainingProperties).to.be.an("array");
+      });
+      pm.test("Deleted property is not in remaining listings", function () {
+          var res = pm.response.json();
+          var removedTag = pm.environment.get("propertyTag");
+          var found = res.remainingProperties.some(function (p) {
+              return p.assetTag === removedTag;
+          });
+          pm.expect(found).to.be.false;
+      });

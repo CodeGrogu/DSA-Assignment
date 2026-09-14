@@ -1,0 +1,47 @@
+$kind: http-request
+name: 02. Search Property
+method: POST
+url: "{{grpc_host}}:{{grpc_port}}/rental.RentalService/search_property"
+headers:
+  - key: Content-Type
+    value: application/grpc+proto
+body:
+  type: json
+  content: |-
+    {
+      "assetTag": "{{propertyTag}}"
+    }
+description: |-
+  ### Endpoint Overview
+  Unary gRPC RPC querying a single property listing by its unique `assetTag`. Returns the full listing record and an operational status string.
+
+  ---
+  ### gRPC Method Specification
+  - **Service**: `rental.RentalService`
+  - **Method**: `search_property`
+  - **Type**: Unary RPC
+  - **URL / Path**: `{{grpc_host}}:{{grpc_port}}/rental.RentalService/search_property`
+
+  ---
+  ### Request Payload (`SearchPropertyRequest`)
+  - `assetTag` (*string*): The unique primary key of the property listing.
+
+  ---
+  ### Automated Test Assertions
+  1. **Found Assertion**: Asserts `found` flag is `true`.
+  2. **Asset Tag Parity**: Validates returned `property.assetTag` matches `{{propertyTag}}`.
+  3. **Availability Status**: Asserts `status` is `Available`.
+order: 2000
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Property search was successful", function () {
+          var res = pm.response.json();
+          pm.expect(res.found).to.be.true;
+          pm.expect(res.status).to.include("Available");
+      });
+      pm.test("Retrieved property assetTag matches query", function () {
+          var res = pm.response.json();
+          pm.expect(res.property.assetTag).to.eql(pm.environment.get("propertyTag"));
+      });

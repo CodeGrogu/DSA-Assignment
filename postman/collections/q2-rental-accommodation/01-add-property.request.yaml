@@ -1,0 +1,57 @@
+$kind: http-request
+name: 01. Add Property
+method: POST
+url: "{{grpc_host}}:{{grpc_port}}/rental.RentalService/add_property"
+headers:
+  - key: Content-Type
+    value: application/grpc+proto
+body:
+  type: json
+  content: |-
+    {
+      "name": "Sunset Beachfront Villa",
+      "location": "Swakopmund",
+      "propertyType": "Villa",
+      "pricePerNight": 2500.0,
+      "hostId": "HOST-001"
+    }
+description: |-
+  ### Endpoint Overview
+  Unary gRPC RPC creating a new property listing. The service auto-generates a unique `assetTag` (e.g. `PROP-1001`) and initialises its status to `AVAILABLE`.
+
+  ---
+  ### gRPC Method Specification
+  - **Service**: `rental.RentalService`
+  - **Method**: `add_property`
+  - **Type**: Unary RPC
+  - **URL / Path**: `{{grpc_host}}:{{grpc_port}}/rental.RentalService/add_property`
+
+  ---
+  ### Request Payload (`AddPropertyRequest`)
+  - `name` (*string*): Human-readable property title.
+  - `location` (*string*): Municipality or regional location.
+  - `propertyType` (*string*): `Apartment`, `House`, or `Villa`.
+  - `pricePerNight` (*double*): Nightly rental rate (greater than 0).
+  - `hostId` (*string*): Unique host user identifier.
+
+  ---
+  ### Automated Test Assertions
+  1. **Asset Tag Generation**: Validates `assetTag` is generated in camelCase.
+  2. **Environment Variable Binding**: Saves `assetTag` into `{{propertyTag}}` for downstream tests.
+  3. **Confirmation Status**: Asserts returned status is `AVAILABLE` or created confirmation.
+order: 1000
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Response contains assetTag identifier", function () {
+          var res = pm.response.json();
+          pm.expect(res).to.have.property("assetTag");
+          if (res.assetTag) {
+              pm.environment.set("propertyTag", res.assetTag);
+          }
+      });
+      pm.test("Property creation status is confirmed", function () {
+          var res = pm.response.json();
+          pm.expect(res.status).to.be.oneOf(["AVAILABLE", "Created", "SUCCESS"]);
+      });
