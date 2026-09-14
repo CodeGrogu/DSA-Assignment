@@ -217,24 +217,36 @@ isolated service "RentalService" on ep {
     #
     # + value - The ConfirmBookingRequest payload
     # + return - ConfirmBookingResponse
-    isolated remote function confirm_booking(ConfirmBookingRequest value) returns ConfirmBookingResponse|error {
+        isolated remote function confirm_booking(ConfirmBookingRequest value) returns ConfirmBookingResponse|error {
         log:printInfo(string `Received confirm_booking RPC request for booking '${value.bookingId}'`);
-        Booking booking = {
-            bookingId: value.bookingId,
-            assetTag: value.assetTag,
-            guestId: value.guestId,
-            checkInDate: "",
-            checkOutDate: "",
-            totalCost: 0.0,
-            status: "CONFIRMED"
-        };
+
+        // --- Validate required fields ---
+        if value.bookingId.trim().length() == 0 {
+            return error grpc:InvalidArgumentError("bookingId must not be empty.");
+        }
+        if value.guestId.trim().length() == 0 {
+            return error grpc:InvalidArgumentError("guestId must not be empty.");
+        }
+        if value.assetTag.trim().length() == 0 {
+            return error grpc:InvalidArgumentError("assetTag must not be empty.");
+        }
+
+        // --- Delegate to store: overlap check, promote to confirmed, clear cart ---
+        Booking|error result = self.store.confirmBooking(value.bookingId, value.guestId, value.assetTag);
+        if result is error {
+            log:printWarn(string `Confirm failed for booking '${value.bookingId}': ${result.message()}`);
+            return error(result.message());
+        }
+
+        log:printInfo(string `Booking '${result.bookingId}' confirmed. Total cost: ${result.totalCost}`);
+
         return {
             success: true,
             message: "Booking confirmed successfully.",
-            bookingId: value.bookingId,
-            totalCost: 0.0,
+            bookingId: result.bookingId,
+            totalCost: result.totalCost,
             status: "CONFIRMED",
-            booking: booking
+            booking: result
         };
     }
 
