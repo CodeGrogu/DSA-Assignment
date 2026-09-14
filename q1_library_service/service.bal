@@ -10,6 +10,15 @@ configurable int servicePort = 9090;
 listener http:Listener httpListener = new (servicePort);
 
 # REST API Service for Library & Resource Management System.
+# CORS enabled so the bonus web interface (served from a different port)
+# can call the REST API from a browser.
+@http:ServiceConfig {
+    cors: {
+        allowOrigins: ["*"],
+        allowMethods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+        allowHeaders: ["Content-Type"]
+    }
+}
 service / on httpListener {
 
     # Service lifecycle initializer.
