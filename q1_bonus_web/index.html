@@ -28,7 +28,19 @@
             </div>
             <p class="hint">Leave both blank to see all assets. Values must match exactly (case-sensitive).</p>
         </section>
-        
+
+        <section id="overdue-panel">
+            <h2>Overdue Dashboard</h2>
+            <p class="hint">Assets with schedules past their due date...</p>
+            <div class="filter-row">
+                <input type="date" id="overdue-date">
+                <button id="load-overdue">Load Overdue</button>
+                <button id="clear-overdue" class="secondary">Clear</button>
+            </div>
+            <p id="overdue-status" class="status"></p>
+            <ul id="overdue-list"></ul>
+        </section>
+
                 <section id="assets-panel">
             <h2>All Assets</h2>
             <button id="load-assets">Load Assets</button>

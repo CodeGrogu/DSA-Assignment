@@ -247,3 +247,49 @@ async function deleteSchedule(assetTag, scheduleId) {
 async function refreshAssetsTable() {
     await loadAssets();
 }
+
+// Overdue dashboard 
+
+document.getElementById("load-overdue").addEventListener("click", async () => {
+    const status = document.getElementById("overdue-status");
+    const list = document.getElementById("overdue-list");
+    status.textContent = "Loading...";
+    list.innerHTML = "";
+
+    let url = `${API_BASE}/assets/overdue`;
+    const dateInput = document.getElementById("overdue-date").value;
+    if (dateInput) {
+        url += `?currentDate=${encodeURIComponent(dateInput)}`;
+    }
+
+    try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const items = await res.json();
+        if (!Array.isArray(items) || items.length === 0) {
+            status.textContent = "No overdue assets.";
+            return;
+        }
+        for (const item of items) {
+            const li = document.createElement("li");
+            const schedules = (item.schedules || [])
+                .map(s => `<div class="overdue-meta">${escapeHtml(s.scheduleId)} — ${escapeHtml(s.scheduleType)} — due ${escapeHtml(s.dueDate)} — ${escapeHtml(s.details)}</div>`)
+                .join("");
+            li.innerHTML = `
+                <div class="overdue-tag">${escapeHtml(item.assetTag)} — ${escapeHtml(item.name)}</div>
+                <div class="overdue-meta">${escapeHtml(item.institution)} · ${escapeHtml(item.site)}</div>
+                ${schedules}
+            `;
+            list.appendChild(li);
+        }
+        status.textContent = `${items.length} overdue asset(s).`;
+    } catch (err) {
+        status.textContent = `Error: ${err.message}`;
+    }
+});
+
+document.getElementById("clear-overdue").addEventListener("click", () => {
+    document.getElementById("overdue-date").value = "";
+    document.getElementById("overdue-status").textContent = "";
+    document.getElementById("overdue-list").innerHTML = "";
+});
