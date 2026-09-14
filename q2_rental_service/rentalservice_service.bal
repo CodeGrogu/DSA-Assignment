@@ -1,5 +1,6 @@
 import ballerina/grpc;
 import ballerina/log;
+import ballerina/time;
 
 # Server port for the Rental Accommodation gRPC service endpoint.
 # Configurable via Config.toml or BAL_CONFIG_VAR_PORT per workspace standards.
@@ -142,22 +143,86 @@ isolated service "RentalService" on ep {
     # + return - BookPropertyResponse
     isolated remote function book_property(BookPropertyRequest value) returns BookPropertyResponse|error {
         log:printInfo(string `Received book_property RPC request for '${value.assetTag}' by '${value.guestId}'`);
-        string bookingId = string `TEMP-${value.assetTag}-${value.guestId}`;
-        Booking booking = {
+
+        // --- Validate required fields ---
+        if value.assetTag.trim().length() == 0 {
+            return error grpc:InvalidArgumentError("assetTag must not be empty.");
+        }
+        if value.guestId.trim().length() == 0 {
+            return error grpc:InvalidArgumentError("guestId must not be empty.");
+        }
+        if value.checkInDate.trim().length() == 0 || value.checkOutDate.trim().length() == 0 {
+            return error grpc:InvalidArgumentError("checkInDate and checkOutDate must not be empty.");
+        }
+
+        // --- Parse dates with explicit error mapping ---
+        time:Civil|error checkInResult = parseDate(value.checkInDate);
+        if checkInResult is error {
+            return error grpc:InvalidArgumentError(string `Invalid checkInDate '${value.checkInDate}'. Expected yyyy-MM-dd format.`);
+        }
+        time:Civil checkIn = checkInResult;
+
+        time:Civil|error checkOutResult = parseDate(value.checkOutDate);
+        if checkOutResult is error {
+            return error grpc:InvalidArgumentError(string `Invalid checkOutDate '${value.checkOutDate}'. Expected yyyy-MM-dd format.`);
+        }
+        time:Civil checkOut = checkOutResult;
+
+        // --- Validate checkOut > checkIn ---
+        int|error nightsResult = nightsBetween(checkIn, checkOut);
+        if nightsResult is error {
+            return error grpc:InvalidArgumentError(string `Failed to compute duration: ${nightsResult.message()}`);
+        }
+        int nights = nightsResult;
+        if nights <= 0 {
+            return error grpc:InvalidArgumentError("checkOutDate must be after checkInDate.");
+        }
+
+        // --- Verify property exists and is available ---
+        Property? prop = self.store.getProperty(value.assetTag);
+        if prop is () {
+            return error grpc:NotFoundError(string `Property '${value.assetTag}' not found.`);
+        }
+        if prop.status != "AVAILABLE" {
+            return error grpc:FailedPreconditionError(string `Property '${value.assetTag}' is not available for booking (status: ${prop.status}).`);
+        }
+
+        // --- Compute cost and generate a unique bookingId ---
+        string bookingId = self.store.nextBookingId();
+        float estimatedCost = <float>(<decimal>nights * <decimal>prop.pricePerNight);
+
+        // --- Place into the temporary cart ---
+        BookingCartEntry entry = {
+            bookingId: bookingId,
+            assetTag: value.assetTag,
+            guestId: value.guestId,
+            checkIn: checkIn,
+            checkOut: checkOut,
+            pricePerNightSnapshot: prop.pricePerNight,
+            nights: nights,
+            estimatedCost: estimatedCost
+        };
+        check self.store.addToCart(entry.clone());
+
+        // --- Build response ---
+        Booking pending = {
             bookingId: bookingId,
             assetTag: value.assetTag,
             guestId: value.guestId,
             checkInDate: value.checkInDate,
             checkOutDate: value.checkOutDate,
-            totalCost: 0.0,
+            totalCost: estimatedCost,
             status: "PENDING"
         };
+
+        log:printInfo(string `Temporary booking '${bookingId}' placed with estimated cost ${estimatedCost}`);
+
         return {
             success: true,
-            message: "Temporary booking reservation placed.",
+            message: "Temporary booking reservation placed. Call confirm_booking to finalize.",
             bookingId: bookingId,
-            estimatedCost: 0.0,
-            booking: booking
+            estimatedCost: estimatedCost,
+            booking: pending
         };
     }
 
@@ -167,22 +232,42 @@ isolated service "RentalService" on ep {
     # + return - ConfirmBookingResponse
     isolated remote function confirm_booking(ConfirmBookingRequest value) returns ConfirmBookingResponse|error {
         log:printInfo(string `Received confirm_booking RPC request for booking '${value.bookingId}'`);
-        Booking booking = {
-            bookingId: value.bookingId,
-            assetTag: value.assetTag,
-            guestId: value.guestId,
-            checkInDate: "",
-            checkOutDate: "",
-            totalCost: 0.0,
-            status: "CONFIRMED"
-        };
+
+        // --- Validate required fields ---
+        if value.bookingId.trim().length() == 0 {
+            return error grpc:InvalidArgumentError("bookingId must not be empty.");
+        }
+        if value.guestId.trim().length() == 0 {
+            return error grpc:InvalidArgumentError("guestId must not be empty.");
+        }
+        if value.assetTag.trim().length() == 0 {
+            return error grpc:InvalidArgumentError("assetTag must not be empty.");
+        }
+
+        // --- Delegate to store: overlap check, promote to confirmed, clear cart ---
+        Booking|error result = self.store.confirmBooking(value.bookingId, value.guestId, value.assetTag);
+        if result is error {
+            log:printWarn(string `Confirm failed for booking '${value.bookingId}': ${result.message()}`);
+            string msg = result.message();
+            if msg.includes("not found") {
+                return error grpc:NotFoundError(msg);
+            } else if msg.includes("mismatch") {
+                return error grpc:InvalidArgumentError(msg);
+            } else if msg.includes("overlap") || msg.includes("not available") || msg.includes("no longer") {
+                return error grpc:FailedPreconditionError(msg);
+            }
+            return error(msg);
+        }
+
+        log:printInfo(string `Booking '${result.bookingId}' confirmed. Total cost: ${result.totalCost}`);
+
         return {
             success: true,
             message: "Booking confirmed successfully.",
-            bookingId: value.bookingId,
-            totalCost: 0.0,
+            bookingId: result.bookingId,
+            totalCost: result.totalCost,
             status: "CONFIRMED",
-            booking: booking
+            booking: result
         };
     }
 

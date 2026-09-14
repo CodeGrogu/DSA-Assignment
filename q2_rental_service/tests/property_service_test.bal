@@ -1,5 +1,6 @@
 import ballerina/grpc;
 import ballerina/test;
+import ballerina/time;
 
 @test:Config {
     groups: ["store", "add"]
@@ -473,5 +474,290 @@ isolated function testAddPropertyTrimsInputs() returns error? {
     test:assertEquals(p.location, "Windhoek", "Location must be trimmed");
     test:assertEquals(p.propertyType, "Loft", "Property type must be trimmed");
     test:assertEquals(p.hostId, "HOST-006", "Host ID must be trimmed");
+}
+
+@test:Config {
+    groups: ["booking", "flow", "cart"]
+}
+isolated function testBookPropertyAndConfirmSuccess() returns error? {
+    PropertyStore store = new ();
+
+    Property prop = store.addProperty({
+        name: "Beachfront Villa",
+        location: "Swakopmund",
+        propertyType: "Villa",
+        pricePerNight: 500.0,
+        hostId: "HOST-001"
+    });
+
+    time:Civil checkIn = check parseDate("2026-10-01");
+    time:Civil checkOut = check parseDate("2026-10-10");
+    int nights = check nightsBetween(checkIn, checkOut);
+    test:assertEquals(nights, 9, "Nights calculation between 2026-10-01 and 2026-10-10 must equal 9");
+
+    string bookingId = store.nextBookingId();
+    test:assertTrue(bookingId.startsWith("BOOK-"), "BookingId must begin with BOOK- prefix");
+
+    float estimatedCost = <float>(<decimal>nights * <decimal>prop.pricePerNight);
+    test:assertEquals(estimatedCost, 4500.0, "9 nights x 500.0 must equal 4500.0 exactly");
+
+    BookingCartEntry entry = {
+        bookingId: bookingId,
+        assetTag: prop.assetTag,
+        guestId: "GUEST-001",
+        checkIn: checkIn,
+        checkOut: checkOut,
+        pricePerNightSnapshot: prop.pricePerNight,
+        nights: nights,
+        estimatedCost: estimatedCost
+    };
+    check store.addToCart(entry);
+
+    // Verify cart entry exists
+    BookingCartEntry? cartEntry = store.getCart(bookingId);
+    test:assertTrue(cartEntry is BookingCartEntry, "Cart entry must exist before confirmation");
+    if cartEntry is BookingCartEntry {
+        test:assertEquals(cartEntry.estimatedCost, 4500.0);
+        test:assertEquals(cartEntry.guestId, "GUEST-001");
+    }
+
+    // Confirm booking
+    Booking confirmed = check store.confirmBooking(bookingId, "GUEST-001", prop.assetTag);
+    test:assertEquals(confirmed.bookingId, bookingId);
+    test:assertEquals(confirmed.status, "CONFIRMED");
+    test:assertEquals(confirmed.totalCost, 4500.0);
+    test:assertEquals(confirmed.checkInDate, "2026-10-01");
+    test:assertEquals(confirmed.checkOutDate, "2026-10-10");
+
+    // Verify cart entry is cleared
+    BookingCartEntry? cartAfter = store.getCart(bookingId);
+    test:assertTrue(cartAfter is (), "Cart entry must be cleared after confirmation");
+
+    // Verify double-confirmation fails
+    Booking|error doubleConfirm = store.confirmBooking(bookingId, "GUEST-001", prop.assetTag);
+    test:assertTrue(doubleConfirm is error, "Double-confirming the same booking must fail");
+}
+
+@test:Config {
+    groups: ["booking", "validation", "dates"]
+}
+isolated function testBookPropertyDateValidation() returns error? {
+    time:Civil d1 = check parseDate("2026-10-05");
+    time:Civil d2 = check parseDate("2026-10-01");
+    int nightsReversed = check nightsBetween(d1, d2);
+    test:assertTrue(nightsReversed <= 0, "Reversed dates must produce non-positive night count");
+
+    time:Civil sameDay = check parseDate("2026-10-05");
+    int nightsSame = check nightsBetween(d1, sameDay);
+    test:assertEquals(nightsSame, 0, "Same-day check-in/out must produce 0 nights");
+}
+
+@test:Config {
+    groups: ["booking", "overlap"]
+}
+isolated function testConfirmBookingOverlappingDatesRejected() returns error? {
+    PropertyStore store = new ();
+
+    Property prop = store.addProperty({
+        name: "Mountain Chalet",
+        location: "Windhoek",
+        propertyType: "Chalet",
+        pricePerNight: 600.0,
+        hostId: "HOST-002"
+    });
+
+    // Confirmed booking: Oct 5 to Oct 10
+    time:Civil b1In = check parseDate("2026-10-05");
+    time:Civil b1Out = check parseDate("2026-10-10");
+    string id1 = store.nextBookingId();
+    BookingCartEntry e1 = {
+        bookingId: id1,
+        assetTag: prop.assetTag,
+        guestId: "GUEST-001",
+        checkIn: b1In,
+        checkOut: b1Out,
+        pricePerNightSnapshot: prop.pricePerNight,
+        nights: 5,
+        estimatedCost: 3000.0
+    };
+    check store.addToCart(e1);
+    _ = check store.confirmBooking(id1, "GUEST-001", prop.assetTag);
+
+    // Case 1: Sub-interval overlap (Oct 6 to Oct 8)
+    time:Civil b2In = check parseDate("2026-10-06");
+    time:Civil b2Out = check parseDate("2026-10-08");
+    string id2 = store.nextBookingId();
+    BookingCartEntry e2 = {
+        bookingId: id2,
+        assetTag: prop.assetTag,
+        guestId: "GUEST-002",
+        checkIn: b2In,
+        checkOut: b2Out,
+        pricePerNightSnapshot: prop.pricePerNight,
+        nights: 2,
+        estimatedCost: 1200.0
+    };
+    check store.addToCart(e2);
+    Booking|error res2 = store.confirmBooking(id2, "GUEST-002", prop.assetTag);
+    test:assertTrue(res2 is error, "Sub-interval overlap must be rejected");
+    if res2 is error {
+        test:assertEquals(res2.message(), string `Dates overlap with existing booking '${id1}'.`);
+    }
+
+    // Case 2: Straddling start (Oct 3 to Oct 7)
+    time:Civil b3In = check parseDate("2026-10-03");
+    time:Civil b3Out = check parseDate("2026-10-07");
+    string id3 = store.nextBookingId();
+    BookingCartEntry e3 = {
+        bookingId: id3,
+        assetTag: prop.assetTag,
+        guestId: "GUEST-003",
+        checkIn: b3In,
+        checkOut: b3Out,
+        pricePerNightSnapshot: prop.pricePerNight,
+        nights: 4,
+        estimatedCost: 2400.0
+    };
+    check store.addToCart(e3);
+    Booking|error res3 = store.confirmBooking(id3, "GUEST-003", prop.assetTag);
+    test:assertTrue(res3 is error, "Straddling start overlap must be rejected");
+
+    // Case 3: Enclosing range (Oct 1 to Oct 15)
+    time:Civil b4In = check parseDate("2026-10-01");
+    time:Civil b4Out = check parseDate("2026-10-15");
+    string id4 = store.nextBookingId();
+    BookingCartEntry e4 = {
+        bookingId: id4,
+        assetTag: prop.assetTag,
+        guestId: "GUEST-004",
+        checkIn: b4In,
+        checkOut: b4Out,
+        pricePerNightSnapshot: prop.pricePerNight,
+        nights: 14,
+        estimatedCost: 8400.0
+    };
+    check store.addToCart(e4);
+    Booking|error res4 = store.confirmBooking(id4, "GUEST-004", prop.assetTag);
+    test:assertTrue(res4 is error, "Enclosing range overlap must be rejected");
+}
+
+@test:Config {
+    groups: ["booking", "overlap", "boundary"]
+}
+isolated function testConfirmBookingAdjacentDatesAllowed() returns error? {
+    PropertyStore store = new ();
+
+    Property prop = store.addProperty({
+        name: "Lakeside Cabin",
+        location: "Walvis Bay",
+        propertyType: "Cabin",
+        pricePerNight: 400.0,
+        hostId: "HOST-003"
+    });
+
+    // Existing: Oct 1 to Oct 5
+    time:Civil aIn = check parseDate("2026-10-01");
+    time:Civil aOut = check parseDate("2026-10-05");
+    string id1 = store.nextBookingId();
+    check store.addToCart({
+        bookingId: id1,
+        assetTag: prop.assetTag,
+        guestId: "GUEST-001",
+        checkIn: aIn,
+        checkOut: aOut,
+        pricePerNightSnapshot: 400.0,
+        nights: 4,
+        estimatedCost: 1600.0
+    });
+    _ = check store.confirmBooking(id1, "GUEST-001", prop.assetTag);
+
+    // Adjacent following: Oct 5 to Oct 10 (same-day checkout/checkin changeover)
+    time:Civil bIn = check parseDate("2026-10-05");
+    time:Civil bOut = check parseDate("2026-10-10");
+    string id2 = store.nextBookingId();
+    check store.addToCart({
+        bookingId: id2,
+        assetTag: prop.assetTag,
+        guestId: "GUEST-002",
+        checkIn: bIn,
+        checkOut: bOut,
+        pricePerNightSnapshot: 400.0,
+        nights: 5,
+        estimatedCost: 2000.0
+    });
+    Booking res2 = check store.confirmBooking(id2, "GUEST-002", prop.assetTag);
+    test:assertEquals(res2.status, "CONFIRMED", "Adjacent following booking must succeed");
+
+    // Adjacent preceding: Sep 25 to Oct 1
+    time:Civil cIn = check parseDate("2026-09-25");
+    time:Civil cOut = check parseDate("2026-10-01");
+    string id3 = store.nextBookingId();
+    check store.addToCart({
+        bookingId: id3,
+        assetTag: prop.assetTag,
+        guestId: "GUEST-003",
+        checkIn: cIn,
+        checkOut: cOut,
+        pricePerNightSnapshot: 400.0,
+        nights: 6,
+        estimatedCost: 2400.0
+    });
+    Booking res3 = check store.confirmBooking(id3, "GUEST-003", prop.assetTag);
+    test:assertEquals(res3.status, "CONFIRMED", "Adjacent preceding booking must succeed");
+}
+
+@test:Config {
+    groups: ["booking", "isolation"]
+}
+isolated function testBookingDifferentPropertiesDoNotConflict() returns error? {
+    PropertyStore store = new ();
+
+    Property prop1 = store.addProperty({
+        name: "Property One",
+        location: "Windhoek",
+        propertyType: "House",
+        pricePerNight: 700.0,
+        hostId: "HOST-001"
+    });
+
+    Property prop2 = store.addProperty({
+        name: "Property Two",
+        location: "Windhoek",
+        propertyType: "House",
+        pricePerNight: 800.0,
+        hostId: "HOST-002"
+    });
+
+    time:Civil inDate = check parseDate("2026-10-01");
+    time:Civil outDate = check parseDate("2026-10-05");
+
+    // Book Property 1
+    string id1 = store.nextBookingId();
+    check store.addToCart({
+        bookingId: id1,
+        assetTag: prop1.assetTag,
+        guestId: "GUEST-001",
+        checkIn: inDate,
+        checkOut: outDate,
+        pricePerNightSnapshot: 700.0,
+        nights: 4,
+        estimatedCost: 2800.0
+    });
+    _ = check store.confirmBooking(id1, "GUEST-001", prop1.assetTag);
+
+    // Book Property 2 for identical dates
+    string id2 = store.nextBookingId();
+    check store.addToCart({
+        bookingId: id2,
+        assetTag: prop2.assetTag,
+        guestId: "GUEST-002",
+        checkIn: inDate,
+        checkOut: outDate,
+        pricePerNightSnapshot: 800.0,
+        nights: 4,
+        estimatedCost: 3200.0
+    });
+    Booking res2 = check store.confirmBooking(id2, "GUEST-002", prop2.assetTag);
+    test:assertEquals(res2.status, "CONFIRMED", "Different properties must never conflict on same dates");
 }
 
