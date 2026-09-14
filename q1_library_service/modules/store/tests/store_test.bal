@@ -251,7 +251,17 @@ function testWorkOrderSubResourceOperations() returns error? {
         test:assertEquals(asset.workOrders[0].status, "OPEN");
     }
 
-    // Update work order
+    // Incomplete task closure rejection
+    models:WorkOrder prematureClose = {
+        orderId: "WO-500",
+        status: "CLOSED",
+        description: "Premature close",
+        tasks: []
+    };
+    models:WorkOrder|error closeWithEmptyFail = updateWorkOrder("TAG-WO-01", prematureClose);
+    test:assertTrue(closeWithEmptyFail is error, "Closing work order with incomplete preserved tasks must fail");
+
+    // Update work order with completed task
     models:WorkOrder updatedWo = {
         orderId: "WO-500",
         status: "CLOSED",
@@ -264,13 +274,22 @@ function testWorkOrderSubResourceOperations() returns error? {
             }
         ]
     };
-    check updateWorkOrder("TAG-WO-01", updatedWo);
+    models:WorkOrder updatedRes = check updateWorkOrder("TAG-WO-01", updatedWo);
+    test:assertEquals(updatedRes.status, "CLOSED");
 
     models:Asset? postUpdate = getAsset("TAG-WO-01");
     if postUpdate is models:Asset {
         test:assertEquals(postUpdate.workOrders[0].status, "CLOSED");
         test:assertTrue(postUpdate.workOrders[0].tasks[0].completed);
     }
+
+    // Task modification on closed work order must be rejected
+    models:WorkOrder|error modTaskFail = updateTaskStatus("TAG-WO-01", "WO-500", "T-1", false);
+    test:assertTrue(modTaskFail is error, "Modifying tasks on closed work order must fail");
+
+    // Closing an already closed work order must be rejected
+    models:WorkOrder|error doubleCloseFail = closeWorkOrder("TAG-WO-01", "WO-500");
+    test:assertTrue(doubleCloseFail is error, "Closing an already closed work order must fail");
 }
 
 @test:Config {}
@@ -303,3 +322,48 @@ function testConcurrentStoreAccess() returns error? {
     models:Asset[] all = getAllAssets();
     test:assertEquals(all.length(), 38);
 }
+
+@test:Config {}
+function testConcurrentTaskAdditionsNoDataLoss() returns error? {
+    models:Asset asset = createTestAsset("TAG-CONC-WO");
+    models:WorkOrder wo = {
+        orderId: "WO-CONC-01",
+        status: "OPEN",
+        description: "Concurrent tasks test",
+        tasks: []
+    };
+    asset.workOrders.push(wo);
+    check addAsset(asset);
+
+    worker w1 returns error? {
+        foreach int i in 1 ... 25 {
+            models:Task t = {
+                taskId: string `T-W1-${i}`,
+                description: string `Task W1 ${i}`,
+                completed: false
+            };
+            check addTask("TAG-CONC-WO", "WO-CONC-01", t);
+        }
+    }
+
+    worker w2 returns error? {
+        foreach int i in 1 ... 25 {
+            models:Task t = {
+                taskId: string `T-W2-${i}`,
+                description: string `Task W2 ${i}`,
+                completed: false
+            };
+            check addTask("TAG-CONC-WO", "WO-CONC-01", t);
+        }
+    }
+
+    check wait w1;
+    check wait w2;
+
+    models:Asset? updated = getAsset("TAG-CONC-WO");
+    test:assertNotEquals(updated, ());
+    if updated is models:Asset {
+        test:assertEquals(updated.workOrders[0].tasks.length(), 50, "All 50 concurrent tasks must be persisted without loss");
+    }
+}
+

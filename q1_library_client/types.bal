@@ -77,6 +77,14 @@ public type Asset record {|
     WorkOrder[] workOrders = [];
 |};
 
+# Organization or ministry institution record.
+# + id - Unique institution identifier
+# + name - Display name of the institution
+public type Institution record {|
+    readonly string id;
+    string name;
+|};
+
 # Validates whether a given status string matches an allowed AssetStatus.
 # + statusStr - Status string to validate
 # + return - True if valid, false otherwise

@@ -1,8 +1,35 @@
+import ballerina/time;
+
 import peerpressure/q1_library_service.models;
 
+isolated function parseIsoDateToSeconds(string dateStr) returns int? {
+    string normalized = dateStr;
+    if !normalized.includes("T") {
+        normalized = normalized + "T00:00:00Z";
+    } else if !normalized.endsWith("Z") && !normalized.includes("+") && !normalized.includes("-") {
+        normalized = normalized + "Z";
+    }
+    time:Civil|error civil = time:civilFromString(normalized);
+    if civil is time:Civil {
+        if civil.utcOffset is () {
+            civil.utcOffset = {hours: 0, minutes: 0};
+        }
+        time:Utc|error utc = time:utcFromCivil(civil);
+        if utc is time:Utc {
+            return utc[0];
+        }
+    }
+    return ();
+}
+
 isolated function hasOverdueSchedule(models:Asset asset, string currentDate) returns boolean {
+    int? currentSecs = parseIsoDateToSeconds(currentDate);
+    if currentSecs is () {
+        return false;
+    }
     foreach models:Schedule schedule in asset.schedules {
-        if schedule.dueDate < currentDate {
+        int? dueSecs = parseIsoDateToSeconds(schedule.dueDate);
+        if dueSecs is int && dueSecs < currentSecs {
             return true;
         }
     }
@@ -37,7 +64,24 @@ isolated class AssetStore {
             if !self.assetTable.hasKey(assetVal.assetTag) {
                 return error(string `Asset with tag '${assetVal.assetTag}' does not exist.`);
             }
-            self.assetTable.put(assetVal);
+            models:Asset existing = self.assetTable.get(assetVal.assetTag);
+            models:Component[] comps = assetVal.components.length() > 0 ? assetVal.components : existing.components;
+            models:Schedule[] scheds = assetVal.schedules.length() > 0 ? assetVal.schedules : existing.schedules;
+            models:WorkOrder[] orders = assetVal.workOrders.length() > 0 ? assetVal.workOrders : existing.workOrders;
+
+            models:Asset updated = {
+                assetTag: assetVal.assetTag,
+                name: assetVal.name.trim().length() > 0 ? assetVal.name : existing.name,
+                description: assetVal.description.trim().length() > 0 ? assetVal.description : existing.description,
+                institution: assetVal.institution.trim().length() > 0 ? assetVal.institution : existing.institution,
+                site: assetVal.site.trim().length() > 0 ? assetVal.site : existing.site,
+                status: assetVal.status,
+                dateAcquired: assetVal.dateAcquired.trim().length() > 0 ? assetVal.dateAcquired : existing.dateAcquired,
+                components: comps,
+                schedules: scheds,
+                workOrders: orders
+            };
+            self.assetTable.put(updated.cloneReadOnly());
         }
     }
 
@@ -249,7 +293,7 @@ isolated class AssetStore {
         }
     }
 
-    isolated function updateWorkOrder(string assetTag, models:WorkOrder workOrder) returns error? {
+    isolated function updateWorkOrder(string assetTag, models:WorkOrder workOrder) returns models:WorkOrder|error {
         models:WorkOrder & readonly woVal = workOrder.cloneReadOnly();
         lock {
             if !self.assetTable.hasKey(assetTag) {
@@ -257,16 +301,36 @@ isolated class AssetStore {
             }
             models:Asset existing = self.assetTable.get(assetTag);
             models:WorkOrder[] orders = [];
+            models:WorkOrder? resultWo = ();
             boolean found = false;
             foreach models:WorkOrder wo in existing.workOrders {
                 if wo.orderId == woVal.orderId {
-                    orders.push(woVal);
                     found = true;
+                    // Preserve existing tasks if woVal.tasks is empty
+                    models:Task[] effectiveTasks = woVal.tasks.length() > 0 ? woVal.tasks : wo.tasks;
+
+                    if woVal.status == "CLOSED" {
+                        foreach models:Task t in effectiveTasks {
+                            if !t.completed {
+                                return error(string `Cannot close work order '${woVal.orderId}': task '${t.taskId}' is not completed.`);
+                            }
+                        }
+                    }
+
+                    models:WorkOrder updatedWo = {
+                        orderId: woVal.orderId,
+                        status: woVal.status,
+                        description: woVal.description.trim().length() > 0 ? woVal.description : wo.description,
+                        compId: woVal.compId is string && (<string>woVal.compId).trim().length() > 0 ? woVal.compId : wo.compId,
+                        tasks: effectiveTasks
+                    };
+                    orders.push(updatedWo);
+                    resultWo = updatedWo;
                 } else {
                     orders.push(wo);
                 }
             }
-            if !found {
+            if !found || resultWo is () {
                 return error(string `Work order with id '${woVal.orderId}' not found on asset '${assetTag}'.`);
             }
 
@@ -283,6 +347,193 @@ isolated class AssetStore {
                 workOrders: orders
             };
             self.assetTable.put(updated.cloneReadOnly());
+            return resultWo.cloneReadOnly();
+        }
+    }
+
+    isolated function addTask(string assetTag, string orderId, models:Task task) returns error? {
+        models:Task & readonly taskVal = task.cloneReadOnly();
+        lock {
+            if !self.assetTable.hasKey(assetTag) {
+                return error(string `Asset with tag '${assetTag}' does not exist.`);
+            }
+            models:Asset existing = self.assetTable.get(assetTag);
+            models:WorkOrder[] orders = [];
+            boolean foundWo = false;
+
+            foreach models:WorkOrder wo in existing.workOrders {
+                if wo.orderId == orderId {
+                    foundWo = true;
+                    if wo.status == "CLOSED" {
+                        return error(string `Cannot add task to closed work order '${orderId}'.`);
+                    }
+                    models:Task[] updatedTasks = [];
+                    foreach models:Task t in wo.tasks {
+                        if t.taskId == taskVal.taskId {
+                            return error(string `Task '${taskVal.taskId}' already exists on work order '${orderId}'.`);
+                        }
+                        updatedTasks.push(t);
+                    }
+                    updatedTasks.push(taskVal);
+
+                    models:WorkOrder updatedWo = {
+                        orderId: wo.orderId,
+                        status: wo.status,
+                        description: wo.description,
+                        compId: wo.compId,
+                        tasks: updatedTasks
+                    };
+                    orders.push(updatedWo);
+                } else {
+                    orders.push(wo);
+                }
+            }
+
+            if !foundWo {
+                return error(string `Work order '${orderId}' not found on asset '${assetTag}'.`);
+            }
+
+            models:Asset updated = {
+                assetTag: existing.assetTag,
+                name: existing.name,
+                description: existing.description,
+                institution: existing.institution,
+                site: existing.site,
+                status: existing.status,
+                dateAcquired: existing.dateAcquired,
+                components: existing.components,
+                schedules: existing.schedules,
+                workOrders: orders
+            };
+            self.assetTable.put(updated.cloneReadOnly());
+        }
+    }
+
+    isolated function updateTaskStatus(string assetTag, string orderId, string taskId, boolean completed) returns models:WorkOrder|error {
+        lock {
+            if !self.assetTable.hasKey(assetTag) {
+                return error(string `Asset with tag '${assetTag}' does not exist.`);
+            }
+            models:Asset existing = self.assetTable.get(assetTag);
+            models:WorkOrder[] orders = [];
+            models:WorkOrder? resultWo = ();
+            boolean foundWo = false;
+
+            foreach models:WorkOrder wo in existing.workOrders {
+                if wo.orderId == orderId {
+                    foundWo = true;
+                    if wo.status == "CLOSED" {
+                        return error(string `Cannot modify tasks on closed work order '${orderId}'.`);
+                    }
+                    models:Task[] updatedTasks = [];
+                    boolean foundTask = false;
+
+                    foreach models:Task t in wo.tasks {
+                        if t.taskId == taskId {
+                            updatedTasks.push({
+                                taskId: t.taskId,
+                                description: t.description,
+                                completed: completed
+                            });
+                            foundTask = true;
+                        } else {
+                            updatedTasks.push(t);
+                        }
+                    }
+
+                    if !foundTask {
+                        return error(string `Task '${taskId}' not found on work order '${orderId}'.`);
+                    }
+
+                    models:WorkOrder updatedWo = {
+                        orderId: wo.orderId,
+                        status: wo.status,
+                        description: wo.description,
+                        compId: wo.compId,
+                        tasks: updatedTasks
+                    };
+                    orders.push(updatedWo);
+                    resultWo = updatedWo;
+                } else {
+                    orders.push(wo);
+                }
+            }
+
+            if !foundWo || resultWo is () {
+                return error(string `Work order '${orderId}' not found on asset '${assetTag}'.`);
+            }
+
+            models:Asset updated = {
+                assetTag: existing.assetTag,
+                name: existing.name,
+                description: existing.description,
+                institution: existing.institution,
+                site: existing.site,
+                status: existing.status,
+                dateAcquired: existing.dateAcquired,
+                components: existing.components,
+                schedules: existing.schedules,
+                workOrders: orders
+            };
+            self.assetTable.put(updated.cloneReadOnly());
+            return resultWo.cloneReadOnly();
+        }
+    }
+
+    isolated function closeWorkOrder(string assetTag, string orderId) returns models:WorkOrder|error {
+        lock {
+            if !self.assetTable.hasKey(assetTag) {
+                return error(string `Asset with tag '${assetTag}' does not exist.`);
+            }
+            models:Asset existing = self.assetTable.get(assetTag);
+            models:WorkOrder[] orders = [];
+            models:WorkOrder? resultWo = ();
+            boolean foundWo = false;
+
+            foreach models:WorkOrder wo in existing.workOrders {
+                if wo.orderId == orderId {
+                    foundWo = true;
+                    if wo.status == "CLOSED" {
+                        return error(string `Work order '${orderId}' is already closed.`);
+                    }
+                    foreach models:Task t in wo.tasks {
+                        if !t.completed {
+                            return error(string `Cannot close work order '${orderId}': task '${t.taskId}' is not completed.`);
+                        }
+                    }
+
+                    models:WorkOrder closedWo = {
+                        orderId: wo.orderId,
+                        status: "CLOSED",
+                        description: wo.description,
+                        compId: wo.compId,
+                        tasks: wo.tasks
+                    };
+                    orders.push(closedWo);
+                    resultWo = closedWo;
+                } else {
+                    orders.push(wo);
+                }
+            }
+
+            if !foundWo || resultWo is () {
+                return error(string `Work order '${orderId}' not found on asset '${assetTag}'.`);
+            }
+
+            models:Asset updated = {
+                assetTag: existing.assetTag,
+                name: existing.name,
+                description: existing.description,
+                institution: existing.institution,
+                site: existing.site,
+                status: existing.status,
+                dateAcquired: existing.dateAcquired,
+                components: existing.components,
+                schedules: existing.schedules,
+                workOrders: orders
+            };
+            self.assetTable.put(updated.cloneReadOnly());
+            return resultWo.cloneReadOnly();
         }
     }
 
@@ -343,8 +594,20 @@ public isolated function createWorkOrder(string assetTag, models:WorkOrder workO
     return storeInstance.createWorkOrder(assetTag, workOrder);
 }
 
-public isolated function updateWorkOrder(string assetTag, models:WorkOrder workOrder) returns error? {
+public isolated function updateWorkOrder(string assetTag, models:WorkOrder workOrder) returns models:WorkOrder|error {
     return storeInstance.updateWorkOrder(assetTag, workOrder);
+}
+
+public isolated function addTask(string assetTag, string orderId, models:Task task) returns error? {
+    return storeInstance.addTask(assetTag, orderId, task);
+}
+
+public isolated function updateTaskStatus(string assetTag, string orderId, string taskId, boolean completed) returns models:WorkOrder|error {
+    return storeInstance.updateTaskStatus(assetTag, orderId, taskId, completed);
+}
+
+public isolated function closeWorkOrder(string assetTag, string orderId) returns models:WorkOrder|error {
+    return storeInstance.closeWorkOrder(assetTag, orderId);
 }
 
 public isolated function resetStore() {

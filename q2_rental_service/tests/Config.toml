@@ -1,0 +1,2 @@
+# Test environment port configuration to prevent collision with running server
+port = 9096
