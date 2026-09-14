@@ -228,7 +228,7 @@ The Git history was checked to confirm that the project contains contributions f
 
 The project reflects genuine collaborative work by the team, with members responsible for understanding and contributing to the submitted implementation.
 
----
+--- 
 
 ## 9. Academic Integrity
 
