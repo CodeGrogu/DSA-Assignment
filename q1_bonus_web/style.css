@@ -47,3 +47,47 @@ pre {
     overflow-x: auto;
     font-size: 13px;
 }
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+    font-size: 14px;
+}
+
+th, td {
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+th {
+    background: #f9fafb;
+    font-weight: 600;
+}
+
+tbody tr:hover {
+    background: #f3f4f6;
+}
+
+.status {
+    color: #666;
+    font-size: 13px;
+    margin-top: 8px;
+}
+
+.badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 500;
+    background: #e5e7eb;
+    color: #374151;
+}
+
+.status-AVAILABLE   { background: #d1fae5; color: #065f46; }
+.status-LOANED_OUT  { background: #fef3c7; color: #92400e; }
+.status-OCCUPIED    { background: #dbeafe; color: #1e40af; }
+.status-UNDER_MAINTENANCE { background: #fee2e2; color: #991b1b; }
+.status-DISPOSED    { background: #e5e7eb; color: #4b5563; }
