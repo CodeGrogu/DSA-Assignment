@@ -335,3 +335,383 @@ function testCloseWorkOrderRequiresAllTasksComplete() returns error? {
     http:Response cleanup = check testClient->/assets/["TAG-WO-TASK-003"].delete();
     test:assertEquals(cleanup.statusCode, 200);
 }
+
+@test:Config {
+    groups: ["service", "validation", "edge_cases"]
+}
+function testEmptyAssetTagAndDateValidationRejected() returns error? {
+    // 1. Empty assetTag rejected
+    json emptyTagAsset = {
+        assetTag: "   ",
+        name: "Blank Tag Asset",
+        description: "Should fail validation",
+        institution: "NUST",
+        site: "Main",
+        status: "AVAILABLE",
+        dateAcquired: "2026-01-15",
+        components: [],
+        schedules: [],
+        workOrders: []
+    };
+    http:Response res1 = check testClient->/assets.post(emptyTagAsset);
+    test:assertEquals(res1.statusCode, 400);
+
+    // 2. Invalid dateAcquired rejected (both bad syntax and calendar impossible)
+    json invalidDateAsset = {
+        assetTag: "TAG-DATE-BAD",
+        name: "Bad Date Asset",
+        description: "Should fail validation",
+        institution: "NUST",
+        site: "Main",
+        status: "AVAILABLE",
+        dateAcquired: "15/01/2026",
+        components: [],
+        schedules: [],
+        workOrders: []
+    };
+    http:Response res2 = check testClient->/assets.post(invalidDateAsset);
+    test:assertEquals(res2.statusCode, 400);
+
+    json impossibleDateAsset = {
+        assetTag: "TAG-DATE-IMPOSSIBLE",
+        name: "Impossible Date Asset",
+        description: "February 31st does not exist",
+        institution: "NUST",
+        site: "Main",
+        status: "AVAILABLE",
+        dateAcquired: "2026-02-31",
+        components: [],
+        schedules: [],
+        workOrders: []
+    };
+    http:Response res2b = check testClient->/assets.post(impossibleDateAsset);
+    test:assertEquals(res2b.statusCode, 400);
+
+    // Empty sub-resource ID validations on asset creation
+    json blankCompAsset = {
+        assetTag: "TAG-BLANK-SUB-1",
+        name: "Blank Comp Asset",
+        description: "Testing blank compId",
+        institution: "NUST",
+        site: "Main",
+        status: "AVAILABLE",
+        dateAcquired: "2026-01-15",
+        components: [{compId: "   ", name: "Bad Comp", description: "Empty id"}],
+        schedules: [],
+        workOrders: []
+    };
+    http:Response resBlankComp = check testClient->/assets.post(blankCompAsset);
+    test:assertEquals(resBlankComp.statusCode, 400);
+
+    json blankSchedAsset = {
+        assetTag: "TAG-BLANK-SUB-2",
+        name: "Blank Sched Asset",
+        description: "Testing blank scheduleId",
+        institution: "NUST",
+        site: "Main",
+        status: "AVAILABLE",
+        dateAcquired: "2026-01-15",
+        components: [],
+        schedules: [{scheduleId: "   ", dueDate: "2026-10-01", scheduleType: "INSPECTION", details: "Check"}],
+        workOrders: []
+    };
+    http:Response resBlankSched = check testClient->/assets.post(blankSchedAsset);
+    test:assertEquals(resBlankSched.statusCode, 400);
+
+    json blankWoAsset = {
+        assetTag: "TAG-BLANK-SUB-3",
+        name: "Blank Wo Asset",
+        description: "Testing blank orderId",
+        institution: "NUST",
+        site: "Main",
+        status: "AVAILABLE",
+        dateAcquired: "2026-01-15",
+        components: [],
+        schedules: [],
+        workOrders: [{orderId: "   ", status: "OPEN", description: "Blank WO", tasks: []}]
+    };
+    http:Response resBlankWo = check testClient->/assets.post(blankWoAsset);
+    test:assertEquals(resBlankWo.statusCode, 400);
+
+    json blankTaskAsset = {
+        assetTag: "TAG-BLANK-SUB-4",
+        name: "Blank Task Asset",
+        description: "Testing blank taskId",
+        institution: "NUST",
+        site: "Main",
+        status: "AVAILABLE",
+        dateAcquired: "2026-01-15",
+        components: [],
+        schedules: [],
+        workOrders: [{orderId: "WO-BLANK-T", status: "OPEN", description: "Blank Task WO", tasks: [{taskId: "  ", description: "Blank", completed: false}]}]
+    };
+    http:Response resBlankTask = check testClient->/assets.post(blankTaskAsset);
+    test:assertEquals(resBlankTask.statusCode, 400);
+
+    // 3. Valid asset creation
+    models:Asset validAsset = {
+        assetTag: "TAG-VAL-01",
+        name: "Valid Asset",
+        description: "Proper asset",
+        institution: "NUST",
+        site: "Main",
+        status: "AVAILABLE",
+        dateAcquired: "2026-01-15",
+        components: [],
+        schedules: [],
+        workOrders: [
+            {
+                orderId: "WO-VAL-01",
+                status: "OPEN",
+                description: "Test order",
+                tasks: []
+            }
+        ]
+    };
+    http:Response res3 = check testClient->/assets.post(validAsset.toJson());
+    test:assertEquals(res3.statusCode, 201);
+
+    // 4. Empty taskId rejected
+    json emptyTask = {taskId: "  ", description: "Empty task ID", completed: false};
+    http:Response res4 = check testClient->post(string `/assets/TAG-VAL-01/work-orders/WO-VAL-01/tasks`, emptyTask);
+    test:assertEquals(res4.statusCode, 400);
+
+    // 5. Invalid currentDate in overdue endpoint rejected
+    http:Response res5 = check testClient->get("/assets/overdue?currentDate=invalid-iso-date");
+    test:assertEquals(res5.statusCode, 400);
+
+    http:Response cleanup = check testClient->/assets/["TAG-VAL-01"].delete();
+    test:assertEquals(cleanup.statusCode, 200);
+}
+
+@test:Config {
+    groups: ["service", "preservation", "subresources"]
+}
+function testSubResourcesPreservedOnPutAsset() returns error? {
+    models:Asset assetWithSubs = {
+        assetTag: "TAG-PRESERVE-01",
+        name: "Oscilloscope 5000",
+        description: "Dual channel scope",
+        institution: "Engineering Faculty",
+        site: "Lab 3",
+        status: "AVAILABLE",
+        dateAcquired: "2026-02-01",
+        components: [
+            {compId: "PROBE-01", name: "10x Probe", description: "Passive voltage probe"}
+        ],
+        schedules: [
+            {scheduleId: "SCH-CAL-01", dueDate: "2026-08-01", scheduleType: "CALIBRATION", details: "Yearly cal"}
+        ],
+        workOrders: [
+            {orderId: "WO-PRE-01", status: "OPEN", description: "Probe recalibration", tasks: []}
+        ]
+    };
+    http:Response createRes = check testClient->/assets.post(assetWithSubs.toJson());
+    test:assertEquals(createRes.statusCode, 201);
+
+    // Update only name and status with empty sub-resource arrays (simulating omitted fields)
+    json updatePayload = {
+        assetTag: "TAG-PRESERVE-01",
+        name: "Oscilloscope 5000 (Calibrated)",
+        description: "Dual channel scope",
+        institution: "Engineering Faculty",
+        site: "Lab 3",
+        status: "UNDER_MAINTENANCE",
+        dateAcquired: "2026-02-01",
+        components: [],
+        schedules: [],
+        workOrders: []
+    };
+    json putRes = check testClient->/assets/["TAG-PRESERVE-01"].put(updatePayload);
+    models:Asset updated = check putRes.cloneWithType(models:Asset);
+    test:assertEquals(updated.name, "Oscilloscope 5000 (Calibrated)");
+    test:assertEquals(updated.status, "UNDER_MAINTENANCE");
+    // Verify sub-resources were preserved!
+    test:assertEquals(updated.components.length(), 1);
+    test:assertEquals(updated.components[0].compId, "PROBE-01");
+    test:assertEquals(updated.schedules.length(), 1);
+    test:assertEquals(updated.schedules[0].scheduleId, "SCH-CAL-01");
+    test:assertEquals(updated.workOrders.length(), 1);
+    test:assertEquals(updated.workOrders[0].orderId, "WO-PRE-01");
+
+    http:Response cleanup = check testClient->/assets/["TAG-PRESERVE-01"].delete();
+    test:assertEquals(cleanup.statusCode, 200);
+}
+
+@test:Config {
+    groups: ["service", "workorders", "guards"]
+}
+function testClosedWorkOrderGuards() returns error? {
+    models:Asset asset = {
+        assetTag: "TAG-GUARD-01",
+        name: "Server Rack PSU",
+        description: "Redundant power unit",
+        institution: "IT Center",
+        site: "Data Center",
+        status: "AVAILABLE",
+        dateAcquired: "2026-01-10",
+        components: [],
+        schedules: [],
+        workOrders: [
+            {
+                orderId: "WO-GUARD-01",
+                status: "OPEN",
+                description: "Fan replacement",
+                tasks: [
+                    {taskId: "T-GUARD-1", description: "Unscrew fan bracket", completed: true}
+                ]
+            }
+        ]
+    };
+    http:Response createRes = check testClient->/assets.post(asset.toJson());
+    test:assertEquals(createRes.statusCode, 201);
+
+    // 1. Close the work order
+    json closeRes = check testClient->post("/assets/TAG-GUARD-01/work-orders/WO-GUARD-01/close", ());
+    models:WorkOrder closedWo = check closeRes.cloneWithType(models:WorkOrder);
+    test:assertEquals(closedWo.status, "CLOSED");
+
+    // 2. Attempt to add a new task to closed work order -> should fail 400
+    json newTask = {taskId: "T-GUARD-2", description: "Install new fan", completed: false};
+    http:Response addTaskRes = check testClient->post("/assets/TAG-GUARD-01/work-orders/WO-GUARD-01/tasks", newTask);
+    test:assertEquals(addTaskRes.statusCode, 400);
+
+    // 3. Attempt to bypass and force CLOSED via PUT work-orders with incomplete tasks -> should fail 400
+    models:WorkOrder bypassAttempt = {
+        orderId: "WO-GUARD-02",
+        status: "CLOSED",
+        description: "Bypass test",
+        tasks: [
+            {taskId: "T-BYPASS", description: "Still active", completed: false}
+        ]
+    };
+    // First create WO-GUARD-02 as OPEN
+    models:WorkOrder openWo = {
+        orderId: "WO-GUARD-02",
+        status: "OPEN",
+        description: "Bypass test",
+        tasks: [
+            {taskId: "T-BYPASS", description: "Still active", completed: false}
+        ]
+    };
+    http:Response createWo2 = check testClient->post("/assets/TAG-GUARD-01/work-orders", openWo.toJson());
+    test:assertEquals(createWo2.statusCode, 201);
+
+    // Now attempt to PUT status CLOSED while T-BYPASS is incomplete -> must fail 400
+    http:Response putClosedRes = check testClient->put("/assets/TAG-GUARD-01/work-orders/WO-GUARD-02", bypassAttempt.toJson());
+    test:assertEquals(putClosedRes.statusCode, 400);
+
+    // 4. Attempt to bypass incomplete task by omitting tasks (tasks: []) in PUT -> must fail 400 and preserve tasks!
+    models:WorkOrder emptyTasksBypass = {
+        orderId: "WO-GUARD-02",
+        status: "CLOSED",
+        description: "Bypass test with empty tasks",
+        tasks: []
+    };
+    http:Response putEmptyClosedRes = check testClient->put("/assets/TAG-GUARD-01/work-orders/WO-GUARD-02", emptyTasksBypass.toJson());
+    test:assertEquals(putEmptyClosedRes.statusCode, 400);
+
+    // 5. Attempt to modify task on already CLOSED work order (WO-GUARD-01) -> must fail 400
+    json modifyTaskPayload = {completed: false};
+    http:Response modifyClosedTaskRes = check testClient->patch("/assets/TAG-GUARD-01/work-orders/WO-GUARD-01/tasks/T-GUARD-1", modifyTaskPayload);
+    test:assertEquals(modifyClosedTaskRes.statusCode, 400);
+
+    // 6. Attempt to close WO-GUARD-01 a second time -> must fail 400 (already closed)
+    http:Response closeAgainRes = check testClient->post("/assets/TAG-GUARD-01/work-orders/WO-GUARD-01/close", ());
+    test:assertEquals(closeAgainRes.statusCode, 400);
+
+    // 7. Complete task on WO-GUARD-02 and successfully close via PUT with empty tasks array (preserving completed task)
+    http:Response completeTaskRes = check testClient->patch("/assets/TAG-GUARD-01/work-orders/WO-GUARD-02/tasks/T-BYPASS", {completed: true});
+    test:assertEquals(completeTaskRes.statusCode, 200);
+
+    json closeWithEmptyTasksRes = check testClient->put("/assets/TAG-GUARD-01/work-orders/WO-GUARD-02", emptyTasksBypass.toJson());
+    models:WorkOrder closedWithPreserved = check closeWithEmptyTasksRes.cloneWithType(models:WorkOrder);
+    test:assertEquals(closedWithPreserved.status, "CLOSED");
+    test:assertEquals(closedWithPreserved.tasks.length(), 1);
+    test:assertEquals(closedWithPreserved.tasks[0].taskId, "T-BYPASS");
+    test:assertTrue(closedWithPreserved.tasks[0].completed);
+
+    http:Response cleanup = check testClient->/assets/["TAG-GUARD-01"].delete();
+    test:assertEquals(cleanup.statusCode, 200);
+}
+
+@test:Config {
+    groups: ["service", "concurrency", "preservation"]
+}
+function testConcurrentAssetPutAndSubResourceMutations() returns error? {
+    models:Asset baseAsset = {
+        assetTag: "TAG-CONCUR-PUT",
+        name: "High Precision Balance",
+        description: "Analytical balance 0.01mg",
+        institution: "Science Faculty",
+        site: "Chemistry Lab",
+        status: "AVAILABLE",
+        dateAcquired: "2026-03-01",
+        components: [
+            {compId: "PAN-01", name: "Weighing Pan", description: "Stainless steel pan"}
+        ],
+        schedules: [],
+        workOrders: [
+            {
+                orderId: "WO-CONCUR-1",
+                status: "OPEN",
+                description: "Calibration order",
+                tasks: []
+            }
+        ]
+    };
+    http:Response createRes = check testClient->/assets.post(baseAsset.toJson());
+    test:assertEquals(createRes.statusCode, 201);
+
+    // 10 concurrent workers: half updating asset status/name, half adding tasks/components
+    worker w1 returns error? {
+        foreach int i in 1 ... 5 {
+            json updatePayload = {
+                assetTag: "TAG-CONCUR-PUT",
+                name: string `High Precision Balance v${i}`,
+                description: "Analytical balance 0.01mg",
+                institution: "Science Faculty",
+                site: "Chemistry Lab",
+                status: "AVAILABLE",
+                dateAcquired: "2026-03-01",
+                components: [],
+                schedules: [],
+                workOrders: []
+            };
+            json _ = check testClient->put("/assets/TAG-CONCUR-PUT", updatePayload);
+        }
+    }
+
+    worker w2 returns error? {
+        foreach int i in 1 ... 5 {
+            json task = {taskId: string `TSK-CON-${i}`, description: string `Cal step ${i}`, completed: false};
+            http:Response res = check testClient->post("/assets/TAG-CONCUR-PUT/work-orders/WO-CONCUR-1/tasks", task);
+            test:assertEquals(res.statusCode, 201);
+        }
+    }
+
+    worker w3 returns error? {
+        foreach int i in 1 ... 5 {
+            json comp = {compId: string `DRAFT-SHIELD-${i}`, name: string `Shield ${i}`, description: "Glass draft shield"};
+            http:Response res = check testClient->post("/assets/TAG-CONCUR-PUT/components", comp);
+            test:assertEquals(res.statusCode, 201);
+        }
+    }
+
+    check wait w1;
+    check wait w2;
+    check wait w3;
+
+    // Verify after all concurrency that none of the sub-resources were lost or wiped out!
+    json getRes = check testClient->get("/assets/TAG-CONCUR-PUT");
+    models:Asset finalAsset = check getRes.cloneWithType(models:Asset);
+
+    // Initial 1 component + 5 added components = 6 components
+    test:assertEquals(finalAsset.components.length(), 6, "All 6 components must be preserved under concurrency");
+    // Work order should have all 5 tasks intact
+    test:assertEquals(finalAsset.workOrders[0].tasks.length(), 5, "All 5 concurrently added tasks must be preserved");
+
+    http:Response cleanup = check testClient->/assets/["TAG-CONCUR-PUT"].delete();
+    test:assertEquals(cleanup.statusCode, 200);
+}
+

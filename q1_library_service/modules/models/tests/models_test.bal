@@ -141,6 +141,10 @@ function testIsoDateValidator() {
     test:assertFalse(isValidIsoDate("2026-8-16"));
     test:assertFalse(isValidIsoDate("invalid-date"));
     test:assertFalse(isValidIsoDate(""));
+    test:assertFalse(isValidIsoDate("2026-02-31"));
+    test:assertFalse(isValidIsoDate("2026-13-01"));
+    test:assertFalse(isValidIsoDate("2026-00-10"));
+    test:assertFalse(isValidIsoDate("2026-04-31"));
 }
 
 @test:Config {}

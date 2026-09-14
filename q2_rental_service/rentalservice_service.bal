@@ -168,6 +168,11 @@ isolated service "RentalService" on ep {
         }
         time:Civil checkOut = checkOutResult;
 
+        // --- Validate checkInDate is not in the past ---
+        if isPastDate(checkIn) {
+            return error grpc:InvalidArgumentError(string `checkInDate '${value.checkInDate}' cannot be in the past.`);
+        }
+
         // --- Validate checkOut > checkIn ---
         int|error nightsResult = nightsBetween(checkIn, checkOut);
         if nightsResult is error {
@@ -187,6 +192,15 @@ isolated service "RentalService" on ep {
             return error grpc:FailedPreconditionError(string `Property '${value.assetTag}' is not available for booking (status: ${prop.status}).`);
         }
 
+        // --- Check date overlaps against confirmed bookings before staging into the cart ---
+        string?|error overlapBookingId = self.store.checkBookingOverlap(value.assetTag, checkIn, checkOut);
+        if overlapBookingId is error {
+            return error grpc:InternalError(string `Overlap check failed: ${overlapBookingId.message()}`);
+        }
+        if overlapBookingId is string {
+            return error grpc:FailedPreconditionError(string `Dates overlap with existing booking '${overlapBookingId}'.`);
+        }
+
         // --- Compute cost and generate a unique bookingId ---
         string bookingId = self.store.nextBookingId();
         float estimatedCost = <float>(<decimal>nights * <decimal>prop.pricePerNight);
@@ -202,7 +216,10 @@ isolated service "RentalService" on ep {
             nights: nights,
             estimatedCost: estimatedCost
         };
-        check self.store.addToCart(entry.clone());
+        error? cartResult = self.store.addToCart(entry.clone());
+        if cartResult is error {
+            return error grpc:FailedPreconditionError(cartResult.message());
+        }
 
         // --- Build response ---
         Booking pending = {

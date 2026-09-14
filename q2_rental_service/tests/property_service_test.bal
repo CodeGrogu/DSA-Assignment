@@ -254,7 +254,7 @@ isolated function testUserModelCreationAndRoleDistinction() {
     groups: ["streaming", "issue41"]
 }
 isolated function testCreateUsersStreamsMoreThanThreeUsers() returns error? {
-    RentalServiceClient rentalClient = check new ("http://localhost:9090");
+    RentalServiceClient rentalClient = check new (string `http://localhost:${port}`);
     Create_usersStreamingClient userStream = check rentalClient->create_users();
     int expectedCount = 5;
 
@@ -759,5 +759,89 @@ isolated function testBookingDifferentPropertiesDoNotConflict() returns error? {
     });
     Booking res2 = check store.confirmBooking(id2, "GUEST-002", prop2.assetTag);
     test:assertEquals(res2.status, "CONFIRMED", "Different properties must never conflict on same dates");
+}
+
+@test:Config {
+    groups: ["booking", "validation", "past_date"]
+}
+isolated function testBookPropertyPastDateRejected() returns error? {
+    PropertyStore store = new ();
+    Property prop = store.addProperty({
+        name: "Historical Lodge",
+        location: "Luderitz",
+        propertyType: "Lodge",
+        pricePerNight: 500.0,
+        hostId: "HOST-004"
+    });
+
+    time:Civil pastCheckIn = check parseDate("1990-01-01");
+    time:Civil pastCheckOut = check parseDate("1990-01-05");
+
+    BookingCartEntry entry = {
+        bookingId: "BOOK-PAST",
+        assetTag: prop.assetTag,
+        guestId: "GUEST-005",
+        checkIn: pastCheckIn,
+        checkOut: pastCheckOut,
+        pricePerNightSnapshot: 500.0,
+        nights: 4,
+        estimatedCost: 2000.0
+    };
+
+    error? cartErr = store.addToCart(entry);
+    test:assertTrue(cartErr is error, "Adding past checkInDate to cart must return an error");
+    if cartErr is error {
+        test:assertEquals(cartErr.message(), "checkInDate cannot be in the past.");
+    }
+}
+
+@test:Config {
+    groups: ["booking", "service", "phase1_overlap"]
+}
+isolated function testBookPropertyOverlapRejectedInPhase1() returns error? {
+    RentalServiceClient clientEp = check new (string `http://localhost:${port}`);
+
+    AddPropertyResponse addResp = check clientEp->add_property({
+        name: "Sunset Dunes Villa",
+        location: "Walvis Bay",
+        propertyType: "Villa",
+        pricePerNight: 650.0,
+        hostId: "HOST-SUNSET"
+    });
+    string tag = addResp.assetTag;
+
+    // Guest 1 books and confirms 2026-11-01 to 2026-11-05
+    BookPropertyResponse book1 = check clientEp->book_property({
+        assetTag: tag,
+        guestId: "GUEST-A",
+        checkInDate: "2026-11-01",
+        checkOutDate: "2026-11-05"
+    });
+    test:assertTrue(book1.success);
+
+    ConfirmBookingResponse conf1 = check clientEp->confirm_booking({
+        bookingId: book1.bookingId,
+        guestId: "GUEST-A",
+        assetTag: tag
+    });
+    test:assertEquals(conf1.status, "CONFIRMED");
+
+    // Guest 2 attempts to book overlapping dates 2026-11-02 to 2026-11-04 (Phase 1)
+    BookPropertyResponse|grpc:Error book2 = clientEp->book_property({
+        assetTag: tag,
+        guestId: "GUEST-B",
+        checkInDate: "2026-11-02",
+        checkOutDate: "2026-11-04"
+    });
+    test:assertTrue(book2 is grpc:Error, "Phase 1 booking with overlapping dates must be rejected immediately");
+
+    // Also test past checkIn via gRPC service
+    BookPropertyResponse|grpc:Error bookPast = clientEp->book_property({
+        assetTag: tag,
+        guestId: "GUEST-C",
+        checkInDate: "1995-05-01",
+        checkOutDate: "1995-05-05"
+    });
+    test:assertTrue(bookPast is grpc:Error, "Past checkInDate via service must return an error");
 }
 

@@ -71,6 +71,96 @@ service / on httpListener {
     # + payload - Complete asset record payload
     # + return - Created asset record (201),Bad request (400) or Conflict(409)
     resource function post assets(@http:Payload models:Asset payload) returns http:Created|http:BadRequest|http:Conflict {
+        if payload.assetTag.trim().length() == 0 {
+            return <http:BadRequest>{
+                body: {
+                    timestamp: time:utcToString(time:utcNow()),
+                    status: 400,
+                    reason: "Bad Request",
+                    message: "Asset tag must not be empty.",
+                    path: "/assets"
+                }
+            };
+        }
+
+        if !models:isValidIsoDate(payload.dateAcquired) {
+            return <http:BadRequest>{
+                body: {
+                    timestamp: time:utcToString(time:utcNow()),
+                    status: 400,
+                    reason: "Bad Request",
+                    message: "Invalid dateAcquired format. Expected 'YYYY-MM-DD'.",
+                    path: "/assets"
+                }
+            };
+        }
+
+        foreach models:Component c in payload.components {
+            if c.compId.trim().length() == 0 {
+                return <http:BadRequest>{
+                    body: {
+                        timestamp: time:utcToString(time:utcNow()),
+                        status: 400,
+                        reason: "Bad Request",
+                        message: "Component ID must not be empty.",
+                        path: "/assets"
+                    }
+                };
+            }
+        }
+
+        foreach models:Schedule sched in payload.schedules {
+            if sched.scheduleId.trim().length() == 0 {
+                return <http:BadRequest>{
+                    body: {
+                        timestamp: time:utcToString(time:utcNow()),
+                        status: 400,
+                        reason: "Bad Request",
+                        message: "Schedule ID must not be empty.",
+                        path: "/assets"
+                    }
+                };
+            }
+            if !models:isValidIsoDate(sched.dueDate) {
+                return <http:BadRequest>{
+                    body: {
+                        timestamp: time:utcToString(time:utcNow()),
+                        status: 400,
+                        reason: "Bad Request",
+                        message: string `Invalid dueDate format in schedule '${sched.scheduleId}'. Expected 'YYYY-MM-DD'.`,
+                        path: "/assets"
+                    }
+                };
+            }
+        }
+
+        foreach models:WorkOrder wo in payload.workOrders {
+            if wo.orderId.trim().length() == 0 {
+                return <http:BadRequest>{
+                    body: {
+                        timestamp: time:utcToString(time:utcNow()),
+                        status: 400,
+                        reason: "Bad Request",
+                        message: "Work order ID must not be empty.",
+                        path: "/assets"
+                    }
+                };
+            }
+            foreach models:Task t in wo.tasks {
+                if t.taskId.trim().length() == 0 {
+                    return <http:BadRequest>{
+                        body: {
+                            timestamp: time:utcToString(time:utcNow()),
+                            status: 400,
+                            reason: "Bad Request",
+                            message: "Task ID must not be empty.",
+                            path: "/assets"
+                        }
+                    };
+                }
+            }
+        }
+
         error? result = store:addAsset(payload);
 
         if result is error {
@@ -122,9 +212,17 @@ service / on httpListener {
     # + payload - Updated asset record
     # + return - Updated asset record (200) or error response
     resource function put assets/[string assetTag](@http:Payload models:Asset payload) returns json|http:NotFound|http:BadRequest {
-        models:Asset updatedAsset = payload;
-        if updatedAsset.assetTag != assetTag {
-            updatedAsset = {
+        if payload.dateAcquired.trim().length() > 0 && !models:isValidIsoDate(payload.dateAcquired) {
+            return <http:BadRequest>{
+                body: {
+                    message: "Invalid dateAcquired format. Expected 'YYYY-MM-DD'."
+                }
+            };
+        }
+
+        models:Asset assetToUpdate = payload;
+        if assetToUpdate.assetTag != assetTag {
+            assetToUpdate = {
                 assetTag: assetTag,
                 name: payload.name,
                 description: payload.description,
@@ -137,15 +235,29 @@ service / on httpListener {
                 workOrders: payload.workOrders
             };
         }
-        error? result = store:updateAsset(updatedAsset);
+
+        error? result = store:updateAsset(assetToUpdate);
         if result is error {
-            return <http:NotFound>{
+            string msg = result.message();
+            if msg.includes("does not exist") {
+                return <http:NotFound>{
+                    body: {
+                        message: msg
+                    }
+                };
+            }
+            return <http:BadRequest>{
                 body: {
-                    message: result.message()
+                    message: msg
                 }
             };
         }
-        return updatedAsset.toJson();
+
+        models:Asset? updated = store:getAsset(assetTag);
+        if updated is models:Asset {
+            return updated.toJson();
+        }
+        return assetToUpdate.toJson();
     }
 
     # Deletes an asset by unique asset tag.
@@ -211,8 +323,7 @@ service / on httpListener {
         string dateToCompare;
 
         if currentDate is string {
-            // Validate basic ISO YYYY-MM-DD date length
-            if currentDate.length() < 10 {
+            if !models:isValidIsoDate(currentDate) {
                 return <http:BadRequest>{
                     body: {
                         timestamp: time:utcToString(time:utcNow()),
@@ -223,7 +334,7 @@ service / on httpListener {
                     }
                 };
             }
-            dateToCompare = currentDate.substring(0, 10);
+            dateToCompare = currentDate;
         } else {
             // Dynamically extract YYYY-MM-DD from current UTC time
             dateToCompare = time:utcToString(time:utcNow()).substring(0, 10);
@@ -237,6 +348,9 @@ service / on httpListener {
     # + component - Component payload
     # + return - Created component (201) or error response
     resource function post assets/[string assetTag]/components(@http:Payload models:Component component) returns http:Created|http:NotFound|http:BadRequest {
+        if component.compId.trim().length() == 0 {
+            return <http:BadRequest>{body: {message: "Component ID must not be empty."}};
+        }
         error? result = store:addComponent(assetTag, component);
         if result is error {
             string msg = result.message();
@@ -267,6 +381,16 @@ service / on httpListener {
     # + schedule - Schedule payload
     # + return - Created schedule (201) or error response
     resource function post assets/[string assetTag]/schedules(@http:Payload models:Schedule schedule) returns http:Created|http:NotFound|http:BadRequest {
+        if schedule.scheduleId.trim().length() == 0 {
+            return <http:BadRequest>{body: {message: "Schedule ID must not be empty."}};
+        }
+        if !models:isValidIsoDate(schedule.dueDate) {
+            return <http:BadRequest>{
+                body: {
+                    message: "Invalid dueDate format. Expected 'YYYY-MM-DD'."
+                }
+            };
+        }
         error? result = store:addSchedule(assetTag, schedule);
         if result is error {
             string msg = result.message();
@@ -297,6 +421,14 @@ service / on httpListener {
     # + workOrder - Work order payload
     # + return - Created work order (201) or error response
     resource function post assets/[string assetTag]/work\-orders(@http:Payload models:WorkOrder workOrder) returns http:Created|http:NotFound|http:BadRequest {
+        if workOrder.orderId.trim().length() == 0 {
+            return <http:BadRequest>{body: {message: "Work order ID must not be empty."}};
+        }
+        foreach models:Task t in workOrder.tasks {
+            if t.taskId.trim().length() == 0 {
+                return <http:BadRequest>{body: {message: "Task ID must not be empty."}};
+            }
+        }
         error? result = store:createWorkOrder(assetTag, workOrder);
         if result is error {
             string msg = result.message();
@@ -324,11 +456,15 @@ service / on httpListener {
                 tasks: workOrder.tasks
             };
         }
-        error? result = store:updateWorkOrder(assetTag, woToUpdate);
+        models:WorkOrder|error result = store:updateWorkOrder(assetTag, woToUpdate);
         if result is error {
-            return <http:NotFound>{body: {message: result.message()}};
+            string msg = result.message();
+            if msg.includes("does not exist") || msg.includes("not found") {
+                return <http:NotFound>{body: {message: msg}};
+            }
+            return <http:BadRequest>{body: {message: msg}};
         }
-        return woToUpdate.toJson();
+        return result.toJson();
     }
 
     # Retrieves all registered institutions.
@@ -380,42 +516,16 @@ service / on httpListener {
     # + task - New task payload
     # + return - Created task (201) or error response
     resource function post assets/[string assetTag]/work\-orders/[string orderId]/tasks(@http:Payload models:Task task) returns http:Created|http:NotFound|http:BadRequest {
-        models:Asset? asset = store:getAsset(assetTag);
-        if asset is () {
-            return <http:NotFound>{body: {message: string `Asset with tag '${assetTag}' not found.`}};
+        if task.taskId.trim().length() == 0 {
+            return <http:BadRequest>{body: {message: "Task ID must not be empty."}};
         }
-        int? idx = ();
-        foreach int i in 0 ..< asset.workOrders.length() {
-            if asset.workOrders[i].orderId == orderId {
-                idx = i;
-                break;
-            }
-        }
-        if idx is () {
-            return <http:NotFound>{body: {message: string `Work order '${orderId}' not found on asset '${assetTag}'.`}};
-        }
-        models:WorkOrder wo = asset.workOrders[idx];
-        foreach models:Task t in wo.tasks {
-            if t.taskId == task.taskId {
-                return <http:BadRequest>{body: {message: string `Task '${task.taskId}' already exists on work order '${orderId}'.`}};
-            }
-        }
-        models:Task[] updatedTasks = [];
-        foreach models:Task t in wo.tasks {
-            updatedTasks.push(t);
-        }
-        updatedTasks.push(task);
-
-        models:WorkOrder updatedWo = {
-            orderId: wo.orderId,
-            status: wo.status,
-            description: wo.description,
-            compId: wo.compId,
-            tasks: updatedTasks
-        };
-        error? result = store:updateWorkOrder(assetTag, updatedWo);
+        error? result = store:addTask(assetTag, orderId, task);
         if result is error {
-            return <http:BadRequest>{body: {message: result.message()}};
+            string msg = result.message();
+            if msg.includes("does not exist") || msg.includes("not found") {
+                return <http:NotFound>{body: {message: msg}};
+            }
+            return <http:BadRequest>{body: {message: msg}};
         }
         return <http:Created>{body: task.toJson()};
     }
@@ -426,47 +536,16 @@ service / on httpListener {
     # + taskId - Unique task identifier
     # + payload - New completion state
     # + return - Updated work order (200) or error response
-    resource function patch assets/[string assetTag]/work\-orders/[string orderId]/tasks/[string taskId](@http:Payload record {|boolean completed;|} payload) returns json|http:NotFound {
-        models:Asset? asset = store:getAsset(assetTag);
-        if asset is () {
-            return <http:NotFound>{body: {message: string `Asset with tag '${assetTag}' not found.`}};
-        }
-        int? woIdx = ();
-        foreach int i in 0 ..< asset.workOrders.length() {
-            if asset.workOrders[i].orderId == orderId {
-                woIdx = i;
-                break;
-            }
-        }
-        if woIdx is () {
-            return <http:NotFound>{body: {message: string `Work order '${orderId}' not found on asset '${assetTag}'.`}};
-        }
-        models:WorkOrder wo = asset.workOrders[woIdx];
-        models:Task[] updatedTasks = [];
-        boolean found = false;
-        foreach models:Task t in wo.tasks {
-            if t.taskId == taskId {
-                updatedTasks.push({taskId: t.taskId, description: t.description, completed: payload.completed});
-                found = true;
-            } else {
-                updatedTasks.push(t);
-            }
-        }
-        if !found {
-            return <http:NotFound>{body: {message: string `Task '${taskId}' not found on work order '${orderId}'.`}};
-        }
-        models:WorkOrder updatedWo = {
-            orderId: wo.orderId,
-            status: wo.status,
-            description: wo.description,
-            compId: wo.compId,
-            tasks: updatedTasks
-        };
-        error? result = store:updateWorkOrder(assetTag, updatedWo);
+    resource function patch assets/[string assetTag]/work\-orders/[string orderId]/tasks/[string taskId](@http:Payload record {|boolean completed;|} payload) returns json|http:NotFound|http:BadRequest {
+        models:WorkOrder|error result = store:updateTaskStatus(assetTag, orderId, taskId, payload.completed);
         if result is error {
-            return <http:NotFound>{body: {message: result.message()}};
+            string msg = result.message();
+            if msg.includes("does not exist") || msg.includes("not found") {
+                return <http:NotFound>{body: {message: msg}};
+            }
+            return <http:BadRequest>{body: {message: msg}};
         }
-        return updatedWo.toJson();
+        return result.toJson();
     }
 
     # Closes a work order once all its tasks are completed.
@@ -474,37 +553,14 @@ service / on httpListener {
     # + orderId - Unique work order identifier
     # + return - Closed work order (200) or error response
     resource function post assets/[string assetTag]/work\-orders/[string orderId]/close() returns json|http:NotFound|http:BadRequest {
-        models:Asset? asset = store:getAsset(assetTag);
-        if asset is () {
-            return <http:NotFound>{body: {message: string `Asset with tag '${assetTag}' not found.`}};
-        }
-        int? idx = ();
-        foreach int i in 0 ..< asset.workOrders.length() {
-            if asset.workOrders[i].orderId == orderId {
-                idx = i;
-                break;
-            }
-        }
-        if idx is () {
-            return <http:NotFound>{body: {message: string `Work order '${orderId}' not found on asset '${assetTag}'.`}};
-        }
-        models:WorkOrder wo = asset.workOrders[idx];
-        foreach models:Task t in wo.tasks {
-            if !t.completed {
-                return <http:BadRequest>{body: {message: string `Cannot close work order '${orderId}': task '${t.taskId}' is not completed.`}};
-            }
-        }
-        models:WorkOrder closedWo = {
-            orderId: wo.orderId,
-            status: "CLOSED",
-            description: wo.description,
-            compId: wo.compId,
-            tasks: wo.tasks
-        };
-        error? result = store:updateWorkOrder(assetTag, closedWo);
+        models:WorkOrder|error result = store:closeWorkOrder(assetTag, orderId);
         if result is error {
-            return <http:BadRequest>{body: {message: result.message()}};
+            string msg = result.message();
+            if msg.includes("does not exist") || msg.includes("not found") {
+                return <http:NotFound>{body: {message: msg}};
+            }
+            return <http:BadRequest>{body: {message: msg}};
         }
-        return closedWo.toJson();
+        return result.toJson();
     }
 }

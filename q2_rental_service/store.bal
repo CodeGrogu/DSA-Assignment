@@ -223,12 +223,46 @@ public isolated class PropertyStore {
         }
     }
 
+    # Checks if the requested date range overlaps with any existing confirmed booking for the given property.
+    #
+    # + assetTag - The asset tag of the property
+    # + checkIn - The requested check-in date
+    # + checkOut - The requested check-out date
+    # + return - The conflicting bookingId if an overlap exists, nil () if no overlap, or error if date comparison fails
+    public isolated function checkBookingOverlap(string assetTag, time:Civil checkIn, time:Civil checkOut) returns string?|error {
+        time:Civil & readonly inVal = checkIn.cloneReadOnly();
+        time:Civil & readonly outVal = checkOut.cloneReadOnly();
+        lock {
+            foreach Booking existing in self.bookings.toArray() {
+                if existing.assetTag != assetTag {
+                    continue;
+                }
+                time:Civil existingIn = check parseDate(existing.checkInDate);
+                time:Civil existingOut = check parseDate(existing.checkOutDate);
+                boolean clash = check overlaps(inVal, outVal, existingIn, existingOut);
+                if clash {
+                    return existing.bookingId;
+                }
+            }
+            return ();
+        }
+    }
+
     # Adds or replaces a cart entry for a guest.
     # Enforces one-cart-per-guest rule: any prior temporary entry for this guest is removed first.
+    # Validates that checkIn is not in the past and checkOut is after checkIn.
     #
     # + entry - The BookingCartEntry to store in the temporary cart
     # + return - Nil on success, or an error if insertion fails
     public isolated function addToCart(BookingCartEntry entry) returns error? {
+        if isPastDate(entry.checkIn) {
+            return error("checkInDate cannot be in the past.");
+        }
+        int|error nights = nightsBetween(entry.checkIn, entry.checkOut);
+        if nights is error || nights <= 0 {
+            return error("checkOutDate must be after checkInDate.");
+        }
+        BookingCartEntry & readonly entryVal = entry.cloneReadOnly();
         lock {
             string[] toRemove = [];
             foreach string key in self.bookingCart.keys() {
@@ -236,14 +270,14 @@ public isolated class PropertyStore {
                 if existing is () {
                     continue;
                 }
-                if existing.guestId == entry.guestId {
+                if existing.guestId == entryVal.guestId {
                     toRemove.push(key);
                 }
             }
             foreach string key in toRemove {
                 _ = self.bookingCart.remove(key);
             }
-            self.bookingCart[entry.bookingId] = entry.clone();
+            self.bookingCart[entryVal.bookingId] = entryVal.clone();
         }
     }
 
@@ -291,6 +325,9 @@ public isolated class PropertyStore {
             }
             if cart.assetTag != assetTag {
                 return error("Asset mismatch for booking request.");
+            }
+            if isPastDate(cart.checkIn) {
+                return error("checkInDate cannot be in the past.");
             }
 
             Property? prop = self.properties[assetTag];
@@ -374,4 +411,31 @@ isolated function overlaps(time:Civil aStart, time:Civil aEnd, time:Civil bStart
 # + return - Two-digit string representation (e.g. 5 -> '05')
 isolated function padZero(int n) returns string {
     return n < 10 ? string `0${n}` : n.toString();
+}
+
+# Checks if a Civil date is in the past compared to current UTC date (ignoring time-of-day).
+#
+# + civilDate - The Civil date to check
+# + return - True if the date is strictly before today's date in UTC, false otherwise
+isolated function isPastDate(time:Civil civilDate) returns boolean {
+    time:Utc nowUtc = time:utcNow();
+    time:Civil nowCivil = time:utcToCivil(nowUtc);
+
+    if civilDate.year < nowCivil.year {
+        return true;
+    } else if civilDate.year > nowCivil.year {
+        return false;
+    }
+
+    int cMonth = civilDate.month;
+    int nMonth = nowCivil.month;
+    if cMonth < nMonth {
+        return true;
+    } else if cMonth > nMonth {
+        return false;
+    }
+
+    int cDay = civilDate.day;
+    int nDay = nowCivil.day;
+    return cDay < nDay;
 }

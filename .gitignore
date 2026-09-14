@@ -13,8 +13,8 @@ Config.local.toml
 .env.*
 !.env.example
 !Config.example.toml
-# the config files used for testing, Uncomment the following line if you want to commit the test config files
-#!**/tests/Config.toml
+# the config files used for testing
+!**/tests/Config.toml
 
 # Agent / AI assistant files
 .agents/
