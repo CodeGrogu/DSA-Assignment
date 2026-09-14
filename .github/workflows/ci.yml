@@ -18,7 +18,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Ballerina Swan Lake
-        uses: ballerina-platform/setup-ballerina@v1.1.0
+        uses: ballerina-platform/setup-ballerina@v1.1.4
         with:
           version: 2201.13.5
 
@@ -38,10 +38,9 @@ jobs:
         run: |
           if [ -d "q2_rental_service/proto" ]; then
             echo "Verifying Q2 Protobuf contract compiles cleanly with bal grpc..."
-            cd q2_rental_service
-            mkdir -p target/grpc_verify
-            bal grpc --input proto/rental_service.proto --output target/grpc_verify --mode service
-            cd ..
+            VERIFY_DIR=$(mktemp -d)
+            bal grpc --input q2_rental_service/proto/rental_service.proto --output "$VERIFY_DIR" --mode service
+            rm -rf "$VERIFY_DIR"
           fi
 
       - name: Run Automated Tests with Coverage
