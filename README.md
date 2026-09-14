@@ -66,7 +66,7 @@ cd DSA-Assignment
 ├── q2_rental_service/         # Question 2: gRPC Service, Proto Contract, and Store
 ├── q2_rental_client/          # Question 2: gRPC Interactive Terminal Client
 ├── postman/                   # Postman v3 YAML Collections and Local Environments
-├── docs/                      # Technical architecture and contributor verification reports
+├── docs/                      # Technical architecture documentation
 ├── .agents/                   # Workspace rules and development skills
 ├── AGENTS.md                  # Developer guidelines and quality gate standards
 └── README.md                  # Master project documentation
@@ -281,44 +281,9 @@ The repository includes a version-controlled Postman test suite under `postman/`
 
 ---
 
-## 8. Contributor Verification & Ownership Matrix
+## 8. Academic Integrity and Group Work Declaration
 
-In compliance with the assignment specification, repository commit history was audited using `git shortlog -sne --all` to confirm genuine collaboration and work distribution across all eight team members:
-
-```text
-    13  Jaden <acehood3556@gmail.com>
-     7  Henchoz <henryheita0@gmail.com>
-     6  Jaden <73761054+CodeGrogu@users.noreply.github.com>
-     5  Kataliina <kataliinamassipa@gmail.com>
-     4  Nangu.Tjizoo <knangukuii@gmail.com>
-     3  Jerganov <klvntapiwa3@gmail.com>
-     2  Florriinnddaa <florinda.funya@gmail.com>
-     2  Kondwani112206 <kondwanikunkwenzu@gmail.com>
-     2  Liina Massipa <162906488+LiinaMassipa@users.noreply.github.com>
-     1  May-Lee Mulundu <117192151+itsyagirlmay@users.noreply.github.com>
-     1  kondwani11220 <kondwanikunkwenzu@gmail.com>
-```
-
-### Team Ownership Table
-
-| # | Student Name | Git Author Identifiers | Primary Module Contributions |
-| :- | :--- | :--- | :--- |
-| 1 | **Jaden Awaseb** (Lead) | `Jaden <acehood3556@gmail.com>`<br>`Jaden <73761054+CodeGrogu...>` | Overall architecture, Q1 REST service, concurrency store mutex locks, Q2 gRPC client implementation (PEE-51), quality gate automation. |
-| 2 | **Henry Heita** | `Henchoz <henryheita0@gmail.com>` | Q1 REST endpoints, query filtering by institution and site, asset modification handlers, and endpoint unit tests. |
-| 3 | **Kataliina (Liina) Massipa** | `Kataliina <kataliinamassipa@gmail.com>`<br>`Liina Massipa <162906488+LiinaMassipa...>` | Q1 canonical asset records, data validation, CRUD test suite design, and endpoint validation testing (PEE-11). |
-| 4 | **Nangu Tjizoo** | `Nangu.Tjizoo <knangukuii@gmail.com>` | Q2 gRPC streaming RPCs: client-streaming user registration (`create_users`), server-streaming property browsing (`list_available_properties`), and stream unit tests. |
-| 5 | **Tapiwa Kelvin Jerganov** | `Jerganov <klvntapiwa3@gmail.com>` | Postman Local Mode v3 YAML test suites, shared environment templates (`peerpressure-local`), and API contract testing (PEE-8). |
-| 6 | **Kondwani Kunkwenzu** | `Kondwani112206 <kondwanikunkwenzu@gmail.com>`<br>`kondwani11220 <kondwanikunkwenzu...>` | Q1 schedule management, overdue item detection, asset status checking, and Q2 property store CRUD operations. |
-| 7 | **Florinda Funya** | `Florriinnddaa <florinda.funya@gmail.com>` | Repository onboarding documentation, setup and execution guides, client terminal workflow walkthroughs, and contributor verification documentation. |
-| 8 | **May-Lee Mulundu** | `May-Lee Mulundu <117192151+itsyagirlmay...>` | Q2 booking business logic: two-phase reservation flow (`book_property` + `confirm_booking`), temporary cart management, and date overlap calculations. |
-
-For detailed audit logs and module breakdowns, refer to [`docs/contributor-verification-report.md`](file:///c:/Users/Jaden/Documents/Programming/University/DSA/DSA-Assignment/docs/contributor-verification-report.md).
-
----
-
-## 9. Academic Integrity and Group Work Declaration
-
-This project represents genuine, collaborative group work authored by the eight members of the Peer Pressure team. In full accordance with the academic integrity policy of the Namibia University of Science and Technology (NUST) and the DSA612S course brief:
+This project represents genuine, collaborative group work authored by the members of the Peer Pressure team. In full accordance with the academic integrity policy of the Namibia University of Science and Technology (NUST) and the DSA612S course brief:
 
 - **Original Authorship:** All software architectures, service implementations, in-memory data structures, client applications, and test harnesses were designed and produced collaboratively by the team.
 - **Individual Understanding:** Each team member understands the implementation of their assigned modules and is prepared to discuss and defend their contributions during assessments.
