@@ -9,6 +9,15 @@ import ballerina/time;
 
 # Internal temporary cart entry. Not part of the gRPC contract.
 # Lives only inside PropertyStore until confirm_booking promotes it.
+#
+# + bookingId - Unique temporary booking identifier string (e.g., 'BOOK-1')
+# + assetTag - Identifier of the property listing being reserved
+# + guestId - Identifier of the guest user making the reservation
+# + checkIn - Parsed check-in civil date representation
+# + checkOut - Parsed check-out civil date representation
+# + pricePerNightSnapshot - Snapshot of property's price per night at time of reservation
+# + nights - Calculated total number of nights for the reservation
+# + estimatedCost - Calculated total estimated cost (nights * pricePerNightSnapshot)
 public type BookingCartEntry record {|
     string bookingId;
     string assetTag;
@@ -57,13 +66,20 @@ public isolated class PropertyStore {
     }
 
     # Retrieves a single property listing by its unique assetTag.
+    #
+    # + assetTag - The unique identifier of the property to retrieve
+    # + return - The Property record if found, or nil `()` if not found
     public isolated function getProperty(string assetTag) returns Property? {
         lock {
             return self.properties[assetTag];
         }
     }
 
-    # Updates an existing property listing.
+    # Updates an existing property listing. Only provided non-empty fields are updated,
+    # preserving untouched metadata without clobbering. Validates status domains and price bounds.
+    #
+    # + req - The UpdatePropertyRequest containing updated field values
+    # + return - The updated Property record, or an error if the listing does not exist or validation fails
     public isolated function updateProperty(UpdatePropertyRequest req) returns Property|error {
         lock {
             Property? current = self.properties[req.assetTag];
@@ -103,7 +119,14 @@ public isolated class PropertyStore {
         }
     }
 
-    # Removes a property listing by its assetTag.
+    # Removes a property listing by its assetTag and returns the host's remaining listings
+    # in that region/location using a declarative query.
+    # Enforces host ownership and location verification before performing the deletion.
+    #
+    # + assetTag - The unique identifier of the property to remove
+    # + hostId - The identifier of the Host owning the listing
+    # + location - The geographical location/region
+    # + return - Array of remaining Property records owned by the host in that location, or error
     public isolated function removeProperty(string assetTag, string hostId, string location) returns Property[]|error {
         lock {
             Property? existing = self.properties[assetTag];
@@ -127,13 +150,19 @@ public isolated class PropertyStore {
     }
 
     # Searches for a property by its assetTag.
+    #
+    # + assetTag - The unique identifier of the property
+    # + return - The Property record if found, or nil `()` if not found
     public isolated function searchProperty(string assetTag) returns Property? {
         lock {
             return self.properties[assetTag];
         }
     }
 
-    # Filters and returns all listings matching the provided criteria.
+    # Filters and returns all listings matching the provided criteria using a declarative query.
+    #
+    # + filter - The search filters (location, price bounds, propertyType)
+    # + return - Array of matching available properties
     public isolated function listAvailableProperties(ListAvailablePropertiesRequest filter) returns Property[] {
         lock {
             Property[] matched = from Property p in self.properties.toArray()
@@ -148,6 +177,9 @@ public isolated class PropertyStore {
     }
 
     # Registers a new user profile in the in-memory store.
+    #
+    # + user - The incoming User payload
+    # + return - The stored User record
     public isolated function addUser(User user) returns User {
         lock {
             User & readonly savedUser = {
@@ -164,6 +196,9 @@ public isolated class PropertyStore {
     }
 
     # Retrieves a single user by their unique userId.
+    #
+    # + userId - The unique identifier of the user
+    # + return - The User record if found, or nil `()` if not found
     public isolated function getUser(string userId) returns User? {
         lock {
             return self.users[userId];
@@ -171,6 +206,8 @@ public isolated class PropertyStore {
     }
 
     # Returns all users currently in the store.
+    #
+    # + return - Array of all User records
     public isolated function getAllUsers() returns User[] {
         lock {
             return self.users.toArray().cloneReadOnly();
@@ -178,6 +215,8 @@ public isolated class PropertyStore {
     }
 
     # Returns all properties currently in the store.
+    #
+    # + return - Array of all Property records
     public isolated function getAllProperties() returns Property[] {
         lock {
             return self.properties.toArray().cloneReadOnly();
@@ -185,7 +224,10 @@ public isolated class PropertyStore {
     }
 
     # Adds or replaces a cart entry for a guest.
-    # One-cart-per-guest rule: any prior entry for this guest is removed first.
+    # Enforces one-cart-per-guest rule: any prior temporary entry for this guest is removed first.
+    #
+    # + entry - The BookingCartEntry to store in the temporary cart
+    # + return - Nil on success, or an error if insertion fails
     public isolated function addToCart(BookingCartEntry entry) returns error? {
         lock {
             string[] toRemove = [];
@@ -205,7 +247,10 @@ public isolated class PropertyStore {
         }
     }
 
-    # Looks up a cart entry by bookingId.
+    # Looks up a temporary cart entry by bookingId.
+    #
+    # + bookingId - The unique identifier of the booking in cart
+    # + return - A clone of the BookingCartEntry if found, or nil `()` if not found
     public isolated function getCart(string bookingId) returns BookingCartEntry? {
         lock {
             BookingCartEntry? entry = self.bookingCart[bookingId];
@@ -216,7 +261,9 @@ public isolated class PropertyStore {
         }
     }
 
-    # Generates a unique bookingId.
+    # Generates a monotonically increasing unique bookingId string.
+    #
+    # + return - The generated unique bookingId (e.g. 'BOOK-1')
     public isolated function nextBookingId() returns string {
         lock {
             string id = string `BOOK-${self.bookingCounter}`;
@@ -225,7 +272,14 @@ public isolated class PropertyStore {
         }
     }
 
-    # Atomic confirm: overlap check, promote cart entry, clear cart.
+    # Atomically confirms a booking: verifies guest and asset matching, checks property availability,
+    # performs half-open date overlap detection against confirmed bookings, promotes cart entry to permanent
+    # booking, and clears the temporary cart entry.
+    #
+    # + bookingId - The unique booking identifier in the temporary cart
+    # + guestId - The identifier of the guest attempting confirmation
+    # + assetTag - The asset tag of the property being confirmed
+    # + return - The confirmed read-only Booking record, or an error if validation or overlap check fails
     public isolated function confirmBooking(string bookingId, string guestId, string assetTag) returns Booking|error {
         lock {
             BookingCartEntry? cart = self.bookingCart[bookingId];
@@ -280,11 +334,18 @@ public isolated class PropertyStore {
 # ============================================================
 
 # Parses a yyyy-MM-dd string into a time:Civil at midnight UTC.
+#
+# + dateStr - The date string formatted as yyyy-MM-dd
+# + return - A time:Civil representation at midnight UTC, or an error if parsing fails
 isolated function parseDate(string dateStr) returns time:Civil|error {
     return time:civilFromString(dateStr + "T00:00:00Z");
 }
 
 # Returns the number of nights between two dates.
+#
+# + checkIn - The check-in Civil date
+# + checkOut - The check-out Civil date
+# + return - The number of nights between check-in and check-out, or an error if UTC conversion fails
 isolated function nightsBetween(time:Civil checkIn, time:Civil checkOut) returns int|error {
     time:Utc u1 = check time:utcFromCivil(checkIn);
     time:Utc u2 = check time:utcFromCivil(checkOut);
@@ -292,7 +353,13 @@ isolated function nightsBetween(time:Civil checkIn, time:Civil checkOut) returns
     return <int>(diff / 86400);
 }
 
-# Returns true if two half-open date ranges overlap.
+# Returns true if two half-open date ranges [start, end) overlap.
+#
+# + aStart - Start date of the first range
+# + aEnd - End date of the first range (checkout)
+# + bStart - Start date of the second range
+# + bEnd - End date of the second range (checkout)
+# + return - True if the ranges overlap, false if they are disjoint or adjacent, or error if conversion fails
 isolated function overlaps(time:Civil aStart, time:Civil aEnd, time:Civil bStart, time:Civil bEnd) returns boolean|error {
     time:Utc aS = check time:utcFromCivil(aStart);
     time:Utc aE = check time:utcFromCivil(aEnd);
@@ -301,7 +368,10 @@ isolated function overlaps(time:Civil aStart, time:Civil aEnd, time:Civil bStart
     return aS[0] < bE[0] && aE[0] > bS[0];
 }
 
-# Zero-pads a number to two digits for date formatting.
+# Zero-pads an integer to at least two digits for ISO date formatting.
+#
+# + n - The integer to format
+# + return - Two-digit string representation (e.g. 5 -> '05')
 isolated function padZero(int n) returns string {
     return n < 10 ? string `0${n}` : n.toString();
 }

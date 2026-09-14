@@ -155,12 +155,25 @@ isolated service "RentalService" on ep {
             return error grpc:InvalidArgumentError("checkInDate and checkOutDate must not be empty.");
         }
 
-        // --- Parse dates ---
-        time:Civil checkIn = check parseDate(value.checkInDate);
-        time:Civil checkOut = check parseDate(value.checkOutDate);
+        // --- Parse dates with explicit error mapping ---
+        time:Civil|error checkInResult = parseDate(value.checkInDate);
+        if checkInResult is error {
+            return error grpc:InvalidArgumentError(string `Invalid checkInDate '${value.checkInDate}'. Expected yyyy-MM-dd format.`);
+        }
+        time:Civil checkIn = checkInResult;
+
+        time:Civil|error checkOutResult = parseDate(value.checkOutDate);
+        if checkOutResult is error {
+            return error grpc:InvalidArgumentError(string `Invalid checkOutDate '${value.checkOutDate}'. Expected yyyy-MM-dd format.`);
+        }
+        time:Civil checkOut = checkOutResult;
 
         // --- Validate checkOut > checkIn ---
-        int nights = check nightsBetween(checkIn, checkOut);
+        int|error nightsResult = nightsBetween(checkIn, checkOut);
+        if nightsResult is error {
+            return error grpc:InvalidArgumentError(string `Failed to compute duration: ${nightsResult.message()}`);
+        }
+        int nights = nightsResult;
         if nights <= 0 {
             return error grpc:InvalidArgumentError("checkOutDate must be after checkInDate.");
         }
@@ -168,10 +181,10 @@ isolated service "RentalService" on ep {
         // --- Verify property exists and is available ---
         Property? prop = self.store.getProperty(value.assetTag);
         if prop is () {
-            return error("Property not found.");
+            return error grpc:NotFoundError(string `Property '${value.assetTag}' not found.`);
         }
         if prop.status != "AVAILABLE" {
-            return error("Property is not available for booking.");
+            return error grpc:FailedPreconditionError(string `Property '${value.assetTag}' is not available for booking (status: ${prop.status}).`);
         }
 
         // --- Compute cost and generate a unique bookingId ---
@@ -235,7 +248,15 @@ isolated service "RentalService" on ep {
         Booking|error result = self.store.confirmBooking(value.bookingId, value.guestId, value.assetTag);
         if result is error {
             log:printWarn(string `Confirm failed for booking '${value.bookingId}': ${result.message()}`);
-            return error(result.message());
+            string msg = result.message();
+            if msg.includes("not found") {
+                return error grpc:NotFoundError(msg);
+            } else if msg.includes("mismatch") {
+                return error grpc:InvalidArgumentError(msg);
+            } else if msg.includes("overlap") || msg.includes("not available") || msg.includes("no longer") {
+                return error grpc:FailedPreconditionError(msg);
+            }
+            return error(msg);
         }
 
         log:printInfo(string `Booking '${result.bookingId}' confirmed. Total cost: ${result.totalCost}`);
