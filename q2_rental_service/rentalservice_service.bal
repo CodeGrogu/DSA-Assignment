@@ -141,7 +141,7 @@ isolated service "RentalService" on ep {
     #
     # + value - The BookPropertyRequest payload
     # + return - BookPropertyResponse
-       isolated remote function book_property(BookPropertyRequest value) returns BookPropertyResponse|error {
+    isolated remote function book_property(BookPropertyRequest value) returns BookPropertyResponse|error {
         log:printInfo(string `Received book_property RPC request for '${value.assetTag}' by '${value.guestId}'`);
 
         // --- Validate required fields ---
@@ -217,7 +217,7 @@ isolated service "RentalService" on ep {
     #
     # + value - The ConfirmBookingRequest payload
     # + return - ConfirmBookingResponse
-        isolated remote function confirm_booking(ConfirmBookingRequest value) returns ConfirmBookingResponse|error {
+    isolated remote function confirm_booking(ConfirmBookingRequest value) returns ConfirmBookingResponse|error {
         log:printInfo(string `Received confirm_booking RPC request for booking '${value.bookingId}'`);
 
         // --- Validate required fields ---

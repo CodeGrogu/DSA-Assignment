@@ -207,14 +207,14 @@ public isolated class PropertyStore {
 
     # Looks up a cart entry by bookingId.
     public isolated function getCart(string bookingId) returns BookingCartEntry? {
-    lock {
-        BookingCartEntry? entry = self.bookingCart[bookingId];
-        if entry is () {
-            return ();
+        lock {
+            BookingCartEntry? entry = self.bookingCart[bookingId];
+            if entry is () {
+                return ();
+            }
+            return entry.clone();
         }
-        return entry.clone();
     }
-}
 
     # Generates a unique bookingId.
     public isolated function nextBookingId() returns string {
@@ -259,18 +259,18 @@ public isolated class PropertyStore {
                 }
             }
 
-           Booking & readonly confirmed = {
-            bookingId: cart.bookingId,
-            assetTag: cart.assetTag,
-            guestId: cart.guestId,
-            checkInDate: string `${cart.checkIn.year}-${padZero(cart.checkIn.month)}-${padZero(cart.checkIn.day)}`,
-            checkOutDate: string `${cart.checkOut.year}-${padZero(cart.checkOut.month)}-${padZero(cart.checkOut.day)}`,
-            totalCost: cart.estimatedCost,
-            status: "CONFIRMED"
+            Booking & readonly confirmed = {
+                bookingId: cart.bookingId,
+                assetTag: cart.assetTag,
+                guestId: cart.guestId,
+                checkInDate: string `${cart.checkIn.year}-${padZero(cart.checkIn.month)}-${padZero(cart.checkIn.day)}`,
+                checkOutDate: string `${cart.checkOut.year}-${padZero(cart.checkOut.month)}-${padZero(cart.checkOut.day)}`,
+                totalCost: cart.estimatedCost,
+                status: "CONFIRMED"
             }.cloneReadOnly();
             self.bookings[cart.bookingId] = confirmed;
             _ = self.bookingCart.remove(bookingId);
-            return confirmed; 
+            return confirmed;
         }
     }
 }
